@@ -2,118 +2,123 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Ultra Messenger Full</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cloud Ultra Mobile</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --bg: #0e1621; --side: #17212b; --blue: #0088cc; --text: #fff; --gray: #708499; --sent: #2b5278; --danger: #e74c3c; --success: #2ecc71; }
-        * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
         
-        /* Auth */
-        #auth-screen { position: fixed; inset: 0; background: var(--bg); z-index: 10000; display: flex; align-items: center; justify-content: center; }
-        .auth-card { background: var(--side); padding: 30px; border-radius: 20px; width: 320px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .auth-card input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #242f3d; background: #0e1621; color: white; }
-        
-        /* Sidebar */
-        .sidebar { width: 320px; background: var(--side); display: flex; flex-direction: column; border-right: 1px solid #000; }
+        /* Mobile Layout Logic */
+        .app-container { display: flex; width: 200vw; height: 100vh; transition: transform 0.3s ease; }
+        .app-container.chat-open { transform: translateX(-100vw); }
+
+        .sidebar, .chat-area { width: 100vw; height: 100vh; display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar { background: var(--side); border-right: 1px solid #000; }
+
+        /* UI Elements */
         .tabs { display: flex; background: #1c2733; }
-        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; color: var(--gray); font-weight: bold; }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; color: var(--gray); font-size: 14px; font-weight: bold; }
         .tab.active { color: var(--blue); border-bottom: 2px solid var(--blue); }
+        
         .sidebar-header { padding: 10px; }
-        .sidebar-header input { width: 100%; padding: 10px; background: #0e1621; border: none; border-radius: 10px; color: white; }
+        .sidebar-header input { width: 100%; padding: 12px; background: #0e1621; border: none; border-radius: 10px; color: white; font-size: 16px; }
         
         .rooms-list { flex: 1; overflow-y: auto; }
-        .item { padding: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid #1c2733; }
-        .item.active { background: var(--sent); }
-        .av { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; color: white; text-transform: uppercase; }
+        .item { padding: 15px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #1c2733; }
+        .av { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; color: white; text-transform: uppercase; font-size: 20px; }
 
-        /* Chat */
-        .chat-area { flex: 1; display: flex; flex-direction: column; background: #0e1621; }
-        .chat-header { padding: 15px; background: var(--side); display: flex; align-items: center; border-bottom: 1px solid #000; }
-        #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
-        .msg { max-width: 75%; padding: 10px; border-radius: 12px; background: #182533; position: relative; word-wrap: break-word; }
-        .msg.sent { align-self: flex-end; background: var(--sent); }
-        .msg b { display: block; font-size: 11px; color: var(--blue); margin-bottom: 4px; }
-        .status { font-size: 10px; float: right; margin-top: 5px; margin-left: 8px; color: var(--gray); }
-        .status.read { color: #2ecc71; }
+        .chat-header { padding: 10px 15px; background: var(--side); display: flex; align-items: center; height: 60px; border-bottom: 1px solid #000; }
+        .back-btn { margin-right: 15px; font-size: 20px; cursor: pointer; display: block; }
+
+        #messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; background: #0e1621; }
+        .msg { max-width: 85%; padding: 10px; border-radius: 15px; background: #182533; position: relative; font-size: 15px; line-height: 1.4; }
+        .msg.sent { align-self: flex-end; background: var(--sent); border-bottom-right-radius: 4px; }
+        .msg b { display: block; font-size: 11px; color: var(--blue); margin-bottom: 3px; }
         
-        .input-bar { padding: 15px; background: var(--side); display: flex; align-items: center; gap: 10px; }
-        .input-bar input[type="text"] { flex: 1; background: #0e1621; border: none; padding: 12px; border-radius: 20px; color: white; }
-        .icon-btn { background: none; border: none; color: var(--gray); font-size: 20px; cursor: pointer; transition: 0.2s; }
-        .icon-btn:hover { color: var(--blue); }
-
-        /* Modals */
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 11000; align-items: center; justify-content: center; }
-        .modal-box { background: var(--side); width: 320px; padding: 25px; border-radius: 20px; text-align: center; }
-        .btn { border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+        .input-bar { padding: 8px 12px; background: var(--side); display: flex; align-items: center; gap: 8px; padding-bottom: env(safe-area-inset-bottom); }
+        .input-bar input[type="text"] { flex: 1; background: #0e1621; border: none; padding: 10px 15px; border-radius: 20px; color: white; font-size: 16px; }
+        
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 10000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-box { background: var(--side); width: 100%; max-width: 320px; padding: 25px; border-radius: 25px; text-align: center; }
+        .btn { border: none; padding: 14px; border-radius: 12px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 16px; }
         .btn-blue { background: var(--blue); color: white; }
+
+        /* Звуковые элементы (невидимые) */
+        audio { display: none; }
     </style>
 </head>
 <body>
 
+<audio id="snd-msg" src="https://raw.githubusercontent.com/fshost/tg-sounds/master/sent.mp3"></audio>
+<audio id="snd-dialing" src="https://raw.githubusercontent.com/fshost/tg-sounds/master/outgoing.mp3" loop></audio>
+<audio id="snd-ring" src="https://raw.githubusercontent.com/fshost/tg-sounds/master/incoming.mp3" loop></audio>
+
 <div id="auth-screen">
-    <div class="auth-card">
-        <i class="fa fa-paper-plane fa-3x" style="color:var(--blue); margin-bottom:10px"></i>
+    <div class="auth-card" style="background:var(--side); padding:30px; border-radius:20px; width:90%; max-width:320px; text-align:center;">
         <h2>Cloud Ultra</h2>
         <input type="text" id="a-login" placeholder="Логин">
         <input type="password" id="a-pass" placeholder="Пароль">
-        <label style="font-size: 13px; color: var(--gray); cursor: pointer;"><input type="checkbox" id="a-rem" checked> Запомнить меня</label>
         <button class="btn btn-blue" onclick="auth('login')">ВОЙТИ</button>
-        <button class="btn" style="background:none; color:var(--gray)" onclick="auth('reg')">Создать аккаунт</button>
+        <button class="btn" style="background:none; color:var(--gray)" onclick="auth('reg')">Регистрация</button>
     </div>
 </div>
 
-<div class="sidebar">
-    <div class="tabs">
-        <div class="tab active" id="tab-ch" onclick="setTab('ch')">КАНАЛЫ</div>
-        <div class="tab" id="tab-dm" onclick="setTab('dm')">ЛИЧНЫЕ</div>
+<div class="app-container" id="app-wrap">
+    <div class="sidebar">
+        <div class="tabs">
+            <div class="tab active" id="tab-ch" onclick="setTab('ch')">КАНАЛЫ</div>
+            <div class="tab" id="tab-dm" onclick="setTab('dm')">ЛИЧНЫЕ</div>
+        </div>
+        <div class="sidebar-header">
+            <input type="text" id="search-input" placeholder="Поиск/ID...">
+            <button class="btn btn-blue" onclick="handleAction()" id="action-btn">Создать канал</button>
+        </div>
+        <div class="rooms-list" id="rooms-list"></div>
+        <div style="padding:15px; background:#1c2733; display:flex; align-items:center; gap:10px;" onclick="openProfile()">
+            <div class="av" id="my-av">?</div>
+            <div style="flex:1"><b id="my-display-name">Профиль</b><div style="font-size:11px; color:var(--gray)" id="my-id-show">ID...</div></div>
+        </div>
     </div>
-    <div class="sidebar-header">
-        <input type="text" id="search-input" placeholder="ID или Название...">
-        <button class="btn btn-blue" onclick="handleAction()" id="action-btn">Создать канал</button>
-    </div>
-    <div class="rooms-list" id="rooms-list"></div>
-    <div style="padding:15px; border-top:1px solid #000; display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="openProfile()">
-        <div class="av" id="my-av">?</div>
-        <div style="flex:1"><b id="my-display-name">...</b><div style="font-size:10px; color:var(--gray)" id="my-id-show">Загрузка...</div></div>
-    </div>
-</div>
 
-<div class="chat-area">
-    <div class="chat-header">
-        <b id="h-name">Выберите чат</b>
-        <button class="icon-btn" id="call-init-btn" style="margin-left:auto; display:none; color:var(--success)" onclick="startCall()"><i class="fa fa-phone"></i></button>
-    </div>
-    <div id="messages"></div>
-    <div class="input-bar">
-        <input type="file" id="file-input" style="display:none" onchange="uploadFile()">
-        <button class="icon-btn" onclick="document.getElementById('file-input').click()"><i class="fa fa-paperclip"></i></button>
-        <input type="text" id="msg-input" placeholder="Напишите..." disabled>
-        <button class="icon-btn" id="voice-btn" onmousedown="startVoice()" onmouseup="stopVoice()" ontouchstart="startVoice()" ontouchend="stopVoice()"><i class="fa fa-microphone"></i></button>
-        <button class="icon-btn" style="color:var(--blue)" onclick="sendMsg()"><i class="fa fa-paper-plane"></i></button>
-    </div>
-</div>
-
-<div class="modal" id="modal-profile">
-    <div class="modal-box">
-        <h3>Настройки профиля</h3>
-        <input type="text" id="edit-name" placeholder="Имя">
-        <input type="text" id="edit-color" placeholder="Цвет (напр. orange или #hex)">
-        <button class="btn btn-blue" onclick="saveProfile()">Сохранить</button>
-        <button class="btn" style="background:var(--danger); color:white" onclick="logout()">Выйти</button>
-        <button class="btn" style="background:none; color:white" onclick="closeModal()">Закрыть</button>
+    <div class="chat-area">
+        <div class="chat-header">
+            <i class="fa fa-arrow-left back-btn" onclick="closeChat()"></i>
+            <b id="h-name">Чат</b>
+            <button class="icon-btn" id="call-init-btn" style="margin-left:auto; display:none; color:var(--success); background:none; border:none; font-size:22px" onclick="startCall()"><i class="fa fa-phone"></i></button>
+        </div>
+        <div id="messages"></div>
+        <div class="input-bar">
+            <input type="file" id="file-input" style="display:none" onchange="uploadFile()">
+            <button class="icon-btn" style="background:none; border:none; color:var(--gray); font-size:22px" onclick="document.getElementById('file-input').click()"><i class="fa fa-paperclip"></i></button>
+            <input type="text" id="msg-input" placeholder="Сообщение..." disabled>
+            <button class="icon-btn" id="voice-btn" style="background:none; border:none; color:var(--gray); font-size:22px" onmousedown="startVoice()" onmouseup="stopVoice()" ontouchstart="startVoice()" ontouchend="stopVoice()"><i class="fa fa-microphone"></i></button>
+            <button class="icon-btn" style="background:none; border:none; color:var(--blue); font-size:22px" onclick="sendMsg()"><i class="fa fa-paper-plane"></i></button>
+        </div>
     </div>
 </div>
 
 <div class="modal" id="call-modal">
     <div class="modal-box">
-        <h2 id="call-status">Вызов...</h2>
+        <h2 id="call-status">Звонок...</h2>
+        <div class="av" id="call-av" style="margin: 20px auto; width: 80px; height: 80px; font-size: 30px; background: var(--blue);">?</div>
         <audio id="remote-audio" autoplay></audio>
         <div style="display:flex; gap:10px; margin-top:20px">
             <button class="btn" id="ans-btn" style="background:var(--success); color:white; display:none">Принять</button>
             <button class="btn" style="background:var(--danger); color:white" onclick="endCall()">Сброс</button>
         </div>
+    </div>
+</div>
+
+<div class="modal" id="modal-profile">
+    <div class="modal-box">
+        <h3>Профиль</h3>
+        <input type="text" id="edit-name" style="width:100%; padding:10px; margin-bottom:10px; border-radius:10px; border:none; background:#0e1621; color:white;" placeholder="Имя">
+        <input type="text" id="edit-color" style="width:100%; padding:10px; margin-bottom:10px; border-radius:10px; border:none; background:#0e1621; color:white;" placeholder="Цвет аватарки">
+        <button class="btn btn-blue" onclick="saveProfile()">Сохранить</button>
+        <button class="btn" style="background:var(--danger); color:white" onclick="logout()">Выход</button>
+        <button class="btn" style="background:none; color:white" onclick="closeModal()">Закрыть</button>
     </div>
 </div>
 
@@ -127,33 +132,32 @@
 
     let user = null, activeId = null, currentTab = 'ch';
     let mediaRecorder, voiceChunks = [], pc, localStream;
-    const rtcConfig = { iceServers: [{urls:'stun:stun.l.google.com:19302'}] };
 
-    // --- Auth ---
+    // --- Звуки ---
+    const playSnd = (id) => document.getElementById(id).play().catch(() => {});
+    const stopSnd = (id) => { const a = document.getElementById(id); a.pause(); a.currentTime = 0; };
+
+    // --- Авторизация ---
     window.auth = async (type) => {
         const l = document.getElementById('a-login').value.trim();
         const p = document.getElementById('a-pass').value.trim();
-        const rem = document.getElementById('a-rem').checked;
-        if(!l || !p) return alert("Заполни поля");
-        
+        if(!l || !p) return;
         if(type === 'reg') {
-            const uid = 'u_' + Math.random().toString(36).substr(2, 6);
+            const uid = 'u_' + Math.random().toString(36).substr(2, 5);
             await set(ref(db, 'users/' + l), { pass: p, uid, name: l, color: '#0088cc' });
-            alert("Готово! Теперь войди.");
+            alert("Аккаунт создан!");
         } else {
             const s = await get(ref(db, 'users/' + l));
             if(s.exists() && s.val().pass === p) {
                 user = { login: l, ...s.val() };
-                if(!user.uid) { user.uid = 'u_'+Math.random().toString(36).substr(2,6); await update(ref(db, 'users/'+l), {uid: user.uid}); }
-                if(rem) localStorage.setItem('cloud_session_full', JSON.stringify({l, p}));
+                localStorage.setItem('cloud_sess_m', JSON.stringify({l, p}));
                 document.getElementById('auth-screen').style.display = 'none';
                 startApp();
-            } else alert("Неверные данные");
+            } else alert("Ошибка!");
         }
     };
 
-    window.logout = () => { localStorage.clear(); location.reload(); };
-    const saved = localStorage.getItem('cloud_session_full');
+    const saved = localStorage.getItem('cloud_sess_m');
     if(saved) { const d = JSON.parse(saved); document.getElementById('a-login').value=d.l; document.getElementById('a-pass').value=d.p; window.auth('login'); }
 
     function startApp() {
@@ -165,24 +169,27 @@
     function updateUI() {
         document.getElementById('my-display-name').innerText = user.name || user.login;
         const av = document.getElementById('my-av');
-        av.innerText = (user.name || user.login)[0];
+        av.innerText = (user.name || user.login)[0].toUpperCase();
         av.style.background = user.color || '#0088cc';
         document.getElementById('my-id-show').innerText = "ID: " + user.uid;
     }
 
+    // --- Мобильная навигация ---
+    window.closeChat = () => { document.getElementById('app-wrap').classList.remove('chat-open'); activeId = null; };
     window.setTab = (t) => {
         currentTab = t;
-        document.getElementById('tab-ch').className = `tab ${t==='ch'?'active':''}`;
-        document.getElementById('tab-dm').className = `tab ${t==='dm'?'active':''}`;
-        document.getElementById('action-btn').innerText = t==='ch'?'Создать канал':'Добавить друга по ID';
+        document.getElementById('tab-ch').classList.toggle('active', t==='ch');
+        document.getElementById('tab-dm').classList.toggle('active', t==='dm');
+        document.getElementById('action-btn').innerText = t==='ch'?'Создать канал':'Добавить по ID';
         renderSidebar();
     };
 
+    // --- Функции чата ---
     window.handleAction = async () => {
         const val = document.getElementById('search-input').value.trim();
         if(!val) return;
         if(currentTab === 'ch') {
-            const cid = 'ch_' + Math.random().toString(36).substr(2, 6);
+            const cid = 'ch_' + Math.random().toString(36).substr(2, 5);
             await set(ref(db, 'rooms/' + cid), { name: val, owner: user.login });
             await update(ref(db, `user_chats/${user.login}`), { [cid]: true });
         } else {
@@ -193,7 +200,7 @@
                 const dmid = [user.login, fLogin].sort().join("___");
                 await update(ref(db, `user_chats/${user.login}`), { [dmid]: true });
                 await update(ref(db, `user_chats/${fLogin}`), { [dmid]: true });
-            } else alert("ID не найден");
+            }
         }
         document.getElementById('search-input').value = '';
     };
@@ -205,7 +212,7 @@
             Object.keys(d).forEach(id => {
                 if(currentTab === 'ch' && id.startsWith('ch_')) {
                     get(ref(db, 'rooms/'+id)).then(r => r.exists() && createItem(id, r.val().name, '#0088cc'));
-                } else if(currentTab === 'dm' && id.includes('___')) {
+                } else if(id.includes('___')) {
                     const f = id.replace(user.login,'').replace('___','');
                     get(ref(db, 'users/'+f)).then(u => createItem(id, u.val().name || f, u.val().color));
                 }
@@ -215,9 +222,9 @@
 
     function createItem(id, name, color) {
         const div = document.createElement('div');
-        div.className = `item ${activeId===id?'active':''}`;
-        div.innerHTML = `<div class="av" style="background:${color}">${name[0]}</div><b>${name}</b>`;
-        div.onclick = () => selectChat(id, name);
+        div.className = `item`;
+        div.innerHTML = `<div class="av" style="background:${color}">${name[0].toUpperCase()}</div><b>${name}</b>`;
+        div.onclick = () => { selectChat(id, name); document.getElementById('app-wrap').classList.add('chat-open'); };
         document.getElementById('rooms-list').appendChild(div);
     }
 
@@ -233,11 +240,11 @@
                 if(d.l !== user.login && !d.read) update(ref(db, `${path}/${m.key}`), { read: true });
                 const div = document.createElement('div');
                 div.className = `msg ${d.l === user.login ? 'sent' : ''}`;
-                let content = d.t;
-                if(d.type === 'file') content = `<a href="${d.t}" download="${d.name}" style="color:cyan">📁 ${d.name}</a>`;
-                if(d.type === 'voice') content = `<audio src="${d.t}" controls style="width:200px"></audio>`;
-                const check = d.l === user.login ? `<span class="status ${d.read?'read':''}">${d.read?'✓✓':'✓'}</span>` : '';
-                div.innerHTML = `<b>${d.l}</b>${content}${check}`;
+                let c = d.t;
+                if(d.type === 'file') c = `<a href="${d.t}" download="${d.name}" style="color:cyan">📁 ${d.name}</a>`;
+                if(d.type === 'voice') c = `<audio src="${d.t}" controls style="width:180px"></audio>`;
+                const check = d.l === user.login ? `<span style="font-size:10px;margin-left:5px;color:${d.read?'#2ecc71':'#708499'}">${d.read?'✓✓':'✓'}</span>` : '';
+                div.innerHTML = `<b>${d.l}</b>${c}${check}`;
                 box.appendChild(div);
             });
             box.scrollTop = box.scrollHeight;
@@ -250,9 +257,9 @@
         const path = activeId.includes('___') ? `dms/${activeId}` : `messages/${activeId}`;
         push(ref(db, path), { l: user.login, t: t || extra.t, read: false, ...extra });
         document.getElementById('msg-input').value = '';
+        playSnd('snd-msg');
     };
 
-    // --- Files & Voice ---
     window.uploadFile = () => {
         const f = document.getElementById('file-input').files[0];
         const r = new FileReader();
@@ -268,61 +275,94 @@
             const b = new Blob(voiceChunks, { type: 'audio/webm' });
             const r = new FileReader();
             r.onload = () => sendMsg({ type: 'voice', t: r.result });
-            r.readAsDataURL(b);
-            voiceChunks = [];
+            r.readAsDataURL(b); voiceChunks = [];
         };
         mediaRecorder.start();
         document.getElementById('voice-btn').style.color = 'red';
     };
     window.stopVoice = () => { if(mediaRecorder) mediaRecorder.stop(); document.getElementById('voice-btn').style.color = 'var(--gray)'; };
 
-    // --- Profile ---
-    window.openProfile = () => { document.getElementById('modal-profile').style.display='flex'; document.getElementById('edit-name').value=user.name; };
-    window.saveProfile = async () => {
-        const name = document.getElementById('edit-name').value;
-        const color = document.getElementById('edit-color').value;
-        await update(ref(db, 'users/'+user.login), {name, color});
-        user.name=name; user.color=color; updateUI(); closeModal();
-    };
-    window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.style.display='none');
-
-    // --- Calls ---
+    // --- ЗВОНКИ ---
     window.startCall = async () => {
         document.getElementById('call-modal').style.display='flex';
-        pc = new RTCPeerConnection(rtcConfig);
+        document.getElementById('call-status').innerText = "Вызов...";
+        playSnd('snd-dialing');
+
+        pc = new RTCPeerConnection({ iceServers: [{urls:'stun:stun.l.google.com:19302'}] });
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+        
         pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${activeId}/c`), e.candidate.toJSON());
         pc.ontrack = e => document.getElementById('remote-audio').srcObject = e.streams[0];
-        const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
         await set(ref(db, `calls/${activeId}/o`), { sdp: offer.sdp, type: offer.type, from: user.login });
-        onValue(ref(db, `calls/${activeId}/a`), async s => { if(s.exists()) await pc.setRemoteDescription(new RTCSessionDescription(s.val())); });
+
+        onValue(ref(db, `calls/${activeId}/a`), async s => {
+            if(s.exists()) {
+                stopSnd('snd-dialing');
+                document.getElementById('call-status').innerText = "Разговор...";
+                await pc.setRemoteDescription(new RTCSessionDescription(s.val()));
+            }
+        });
+        
+        // Очистка при сбросе другим игроком
+        onValue(ref(db, `calls/${activeId}`), s => { if(!s.exists()) endCall(); });
     };
 
     function listenCalls() {
         onValue(ref(db, 'calls'), s => {
             s.forEach(c => {
-                if(c.key.includes(user.login) && c.val().o && c.val().o.from !== user.login) {
+                const data = c.val();
+                if(c.key.includes(user.login) && data.o && data.o.from !== user.login) {
+                    playSnd('snd-ring');
                     document.getElementById('call-modal').style.display='flex';
-                    document.getElementById('call-status').innerText = "Входящий вызов...";
+                    document.getElementById('call-status').innerText = "Входящий вызов от " + data.o.from;
                     document.getElementById('ans-btn').style.display='block';
+                    
                     document.getElementById('ans-btn').onclick = async () => {
-                        pc = new RTCPeerConnection(rtcConfig);
+                        stopSnd('snd-ring');
+                        pc = new RTCPeerConnection({ iceServers: [{urls:'stun:stun.l.google.com:19302'}] });
                         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                         localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+                        
                         pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${c.key}/c`), e.candidate.toJSON());
                         pc.ontrack = e => document.getElementById('remote-audio').srcObject = e.streams[0];
-                        await pc.setRemoteDescription(new RTCSessionDescription(c.val().o));
-                        const a = await pc.createAnswer(); await pc.setLocalDescription(a);
+                        
+                        await pc.setRemoteDescription(new RTCSessionDescription(data.o));
+                        const a = await pc.createAnswer();
+                        await pc.setLocalDescription(a);
                         await set(ref(db, `calls/${c.key}/a`), { sdp: a.sdp, type: a.type });
+                        
                         document.getElementById('ans-btn').style.display='none';
-                        document.getElementById('call-status').innerText = "Разговор...";
+                        document.getElementById('call-status').innerText = "В разговоре";
+                        
+                        onValue(ref(db, `calls/${c.key}/c`), cs => {
+                            cs.forEach(cand => pc.addIceCandidate(new RTCIceCandidate(cand.val())));
+                        });
                     };
                 }
             });
         });
     }
-    window.endCall = () => { location.reload(); };
+
+    window.endCall = () => {
+        stopSnd('snd-dialing'); stopSnd('snd-ring');
+        if(pc) pc.close();
+        if(activeId) remove(ref(db, 'calls/'+activeId));
+        location.reload();
+    };
+
+    window.openProfile = () => document.getElementById('modal-profile').style.display='flex';
+    window.saveProfile = async () => {
+        const n = document.getElementById('edit-name').value;
+        const c = document.getElementById('edit-color').value;
+        await update(ref(db, 'users/'+user.login), {name:n, color:c});
+        location.reload();
+    };
+    window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.style.display='none');
+    window.logout = () => { localStorage.clear(); location.reload(); };
 </script>
 </body>
 </html>
