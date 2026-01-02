@@ -3,63 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Audio Messenger</title>
+    <title>Cloud Ultra Messenger</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg: #0e1621; --side: #17212b; --blue: #0088cc;
-            --text: #ffffff; --gray: #708499; --sent: #2b5278; --danger: #e74c3c; --success: #2ecc71;
-        }
-        * { box-sizing: border-box; outline: none; }
-        body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
-
+        :root { --bg: #0e1621; --side: #17212b; --blue: #0088cc; --text: #fff; --gray: #708499; --sent: #2b5278; --danger: #e74c3c; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+        
         /* Auth */
         #auth-screen { position: fixed; inset: 0; background: var(--bg); z-index: 10000; display: flex; align-items: center; justify-content: center; }
-        .auth-card { background: var(--side); padding: 30px; border-radius: 20px; width: 320px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
-        .auth-card input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #242f3d; background: #0e1621; color: white; }
-        .btn { border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: 600; width: 100%; transition: 0.2s; }
-        .btn-blue { background: var(--blue); color: white; }
-
-        /* Sidebar */
-        .sidebar { width: 320px; background: var(--side); display: flex; flex-direction: column; border-right: 1px solid #0e1621; }
-        .tabs { display: flex; background: #1c2733; }
-        .tab { flex: 1; padding: 14px; text-align: center; cursor: pointer; color: var(--gray); font-size: 13px; }
-        .tab.active { color: var(--blue); border-bottom: 2px solid var(--blue); }
-        .sidebar-header { padding: 15px; border-bottom: 1px solid #0e1621; }
-        .sidebar-header input { width: 100%; background: #0e1621; border: none; padding: 10px; border-radius: 10px; color: white; margin-bottom: 8px; }
+        .auth-card { background: var(--side); padding: 30px; border-radius: 20px; width: 320px; text-align: center; }
+        .auth-card input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #242f3d; background: #0e1621; color: white; }
         
+        /* Sidebar */
+        .sidebar { width: 320px; background: var(--side); display: flex; flex-direction: column; border-right: 1px solid #000; }
+        .tabs { display: flex; background: #1c2733; }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; color: var(--gray); font-weight: bold; }
+        .tab.active { color: var(--blue); border-bottom: 2px solid var(--blue); }
         .rooms-list { flex: 1; overflow-y: auto; }
-        .item { padding: 12px 15px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid #1c2733; }
+        .item { padding: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid #1c2733; }
         .item.active { background: var(--sent); }
-        .av { width: 45px; height: 45px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0; }
+        .av { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
 
         /* Chat */
-        .chat-area { flex: 1; display: flex; flex-direction: column; background: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png') #0e1621; background-blend-mode: overlay; }
-        .chat-header { height: 60px; background: var(--side); display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid #0e1621; }
-        #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
-        .msg { max-width: 70%; padding: 8px 12px; border-radius: 12px; background: #182533; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: #0e1621; }
+        #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 75%; padding: 10px; border-radius: 12px; background: #182533; position: relative; }
         .msg.sent { align-self: flex-end; background: var(--sent); }
-
-        .input-bar { padding: 12px 20px; background: var(--side); display: flex; align-items: center; gap: 12px; }
+        .msg b { display: block; font-size: 12px; color: var(--blue); margin-bottom: 4px; }
+        
+        .input-bar { padding: 15px; background: var(--side); display: flex; align-items: center; gap: 10px; }
         .input-bar input { flex: 1; background: #0e1621; border: none; padding: 12px; border-radius: 20px; color: white; }
         .icon-btn { background: none; border: none; color: var(--gray); font-size: 20px; cursor: pointer; }
 
-        /* Modal Call */
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 11000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .modal-box { background: var(--side); width: 300px; padding: 30px; border-radius: 25px; text-align: center; }
-        .call-anim { animation: pulse 1.5s infinite; color: var(--success); }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        /* Modal */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 11000; align-items: center; justify-content: center; }
+        .modal-box { background: var(--side); width: 320px; padding: 25px; border-radius: 20px; text-align: center; }
+        .btn { border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+        .btn-blue { background: var(--blue); color: white; }
     </style>
 </head>
 <body>
 
 <div id="auth-screen">
     <div class="auth-card">
-        <i class="fa-brands fa-telegram fa-4x" style="color:var(--blue); margin-bottom:15px;"></i>
-        <h2>Cloud Audio</h2>
+        <h2>Cloud Ultra</h2>
         <input type="text" id="a-login" placeholder="Логин">
         <input type="password" id="a-pass" placeholder="Пароль">
+        <label style="font-size: 13px; color: var(--gray); cursor: pointer;">
+            <input type="checkbox" id="a-rem" checked> Запомнить меня
+        </label>
         <button class="btn btn-blue" onclick="auth('login')">ВОЙТИ</button>
         <button class="btn" style="background:none; color:var(--gray)" onclick="auth('reg')">Регистрация</button>
     </div>
@@ -70,51 +62,52 @@
         <div class="tab active" id="tab-ch" onclick="setTab('ch')">КАНАЛЫ</div>
         <div class="tab" id="tab-dm" onclick="setTab('dm')">ЛИЧНЫЕ</div>
     </div>
-    <div class="sidebar-header">
-        <input type="text" id="search-input" placeholder="Введите ID...">
+    <div style="padding: 10px;">
+        <input type="text" id="search-input" placeholder="ID друга или канала..." style="width:100%; padding:10px; background:#0e1621; border:none; border-radius:10px; color:white;">
         <button class="btn btn-blue" onclick="handleAction()" id="action-btn">Создать канал</button>
     </div>
     <div class="rooms-list" id="rooms-list"></div>
-    <div style="padding:15px; border-top:1px solid #0e1621; display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="openProfile()">
-        <div class="av" id="my-av">?</div>
-        <div style="flex:1"><b id="my-name">...</b><div style="font-size:10px; color:var(--gray)">Настройки</div></div>
+    <div style="padding:15px; border-top:1px solid #000; display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="openProfile()">
+        <div class="av" id="my-av" style="background:var(--blue)">?</div>
+        <div style="flex:1"><b id="my-display-name">...</b><div style="font-size:10px; color:var(--gray)" id="my-id-show">ID</div></div>
     </div>
 </div>
 
 <div class="chat-area">
-    <div class="chat-header">
+    <div style="padding:15px; background:var(--side); display:flex; align-items:center; border-bottom:1px solid #000;">
         <b id="h-name">Выберите чат</b>
-        <button class="icon-btn" id="call-init-btn" onclick="startCall()" style="margin-left:auto; display:none; color:var(--success)">
-            <i class="fa fa-phone"></i>
-        </button>
+        <button class="icon-btn" id="call-btn" style="margin-left:auto; display:none; color:#2ecc71" onclick="startCall()"><i class="fa fa-phone"></i></button>
     </div>
     <div id="messages"></div>
     <div class="input-bar">
+        <input type="file" id="file-input" style="display:none" onchange="uploadFile()">
+        <button class="icon-btn" onclick="document.getElementById('file-input').click()"><i class="fa fa-paperclip"></i></button>
         <input type="text" id="msg-input" placeholder="Сообщение..." disabled>
+        <button class="icon-btn" id="voice-btn" onmousedown="startVoice()" onmouseup="stopVoice()"><i class="fa fa-microphone"></i></button>
         <button class="icon-btn" style="color:var(--blue)" onclick="sendMsg()"><i class="fa fa-paper-plane"></i></button>
+    </div>
+</div>
+
+<div class="modal" id="modal-profile">
+    <div class="modal-box">
+        <h3>Профиль</h3>
+        <input type="text" id="edit-name" placeholder="Отображаемое имя">
+        <input type="text" id="edit-color" placeholder="Цвет аватарки (например, orange)">
+        <button class="btn btn-blue" onclick="saveProfile()">Сохранить</button>
+        <button class="btn" style="background:var(--danger); color:white" onclick="logout()">Выйти</button>
+        <button class="btn" style="background:none; color:white" onclick="closeModal()">Закрыть</button>
     </div>
 </div>
 
 <div class="modal" id="call-modal">
     <div class="modal-box">
-        <i class="fa fa-phone-volume fa-3x call-anim"></i>
-        <h3 id="call-title">Звонок...</h3>
-        <p id="call-user">Имя</p>
-        <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="btn" id="answer-btn" style="background:var(--success); color:white; display:none;">Принять</button>
-            <button class="btn" id="hangup-btn" style="background:var(--danger); color:white;">Сброс</button>
-        </div>
+        <h2 id="call-status">Звонок...</h2>
+        <p id="call-target"></p>
         <audio id="remote-audio" autoplay></audio>
-    </div>
-</div>
-
-<div class="modal" id="modal-p">
-    <div class="modal-box">
-        <h3>Ваш ID</h3>
-        <p id="p-uid" style="background:#0e1621; padding:10px; border-radius:10px; font-family:monospace;"></p>
-        <button class="btn btn-blue" onclick="copyUID()">Копировать ID</button>
-        <button class="btn" style="background:var(--danger); color:white; margin-top:10px;" onclick="logout()">ВЫЙТИ</button>
-        <button class="btn" style="background:none; color:white; margin-top:5px" onclick="document.getElementById('modal-p').style.display='none'">Назад</button>
+        <div style="display:flex; gap:10px;">
+            <button class="btn" id="ans-btn" style="background:#2ecc71; display:none">Принять</button>
+            <button class="btn" style="background:var(--danger)" onclick="location.reload()">Сброс</button>
+        </div>
     </div>
 </div>
 
@@ -127,25 +120,25 @@
     const db = getDatabase(app);
 
     let user = null, activeId = null, currentTab = 'ch';
+    let mediaRecorder, voiceChunks = [];
     let pc, localStream;
-    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-
-    const genID = (pre) => pre + '_' + Math.random().toString(36).substr(2, 9);
 
     // --- Auth ---
     window.auth = async (type) => {
         const l = document.getElementById('a-login').value.trim();
         const p = document.getElementById('a-pass').value.trim();
+        const rem = document.getElementById('a-rem').checked;
         if(!l || !p) return;
+
         if(type === 'reg') {
-            await set(ref(db, 'users/' + l), { pass: p, uid: genID('u') });
-            alert("Ок!");
+            const uid = 'u_' + Math.random().toString(36).substr(2, 9);
+            await set(ref(db, 'users/' + l), { pass: p, uid, name: l, color: '#0088cc' });
+            alert("Успешно!");
         } else {
             const s = await get(ref(db, 'users/' + l));
             if(s.exists() && s.val().pass === p) {
                 user = { login: l, ...s.val() };
-                if(!user.uid) { user.uid = genID('u'); await update(ref(db, 'users/'+l), {uid: user.uid}); }
-                localStorage.setItem('cloud_v10', JSON.stringify({l, p}));
+                if(rem) localStorage.setItem('cloud_user', JSON.stringify({l, p}));
                 document.getElementById('auth-screen').style.display = 'none';
                 startApp();
             } else alert("Ошибка");
@@ -153,55 +146,63 @@
     };
 
     window.logout = () => { localStorage.clear(); location.reload(); };
-    const saved = localStorage.getItem('cloud_v10');
-    if(saved) { const d = JSON.parse(saved); document.getElementById('a-login').value=d.l; document.getElementById('a-pass').value=d.p; window.auth('login'); }
-
-    function startApp() {
-        document.getElementById('my-name').innerText = user.login;
-        document.getElementById('my-av').innerText = user.login[0].toUpperCase();
-        onValue(ref(db, `user_chats/${user.login}`), () => renderSidebar());
-        listenForCalls();
+    const saved = localStorage.getItem('cloud_user');
+    if(saved) { 
+        const d = JSON.parse(saved); 
+        document.getElementById('a-login').value=d.l; 
+        document.getElementById('a-pass').value=d.p; 
+        window.auth('login'); 
     }
 
-    // --- Sidebar ---
+    function startApp() {
+        updateUI();
+        onValue(ref(db, `user_chats/${user.login}`), () => renderSidebar());
+        listenCalls();
+    }
+
+    function updateUI() {
+        document.getElementById('my-display-name').innerText = user.name || user.login;
+        document.getElementById('my-av').innerText = (user.name || user.login)[0].toUpperCase();
+        document.getElementById('my-av').style.background = user.color || '#0088cc';
+        document.getElementById('my-id-show').innerText = "ID: " + user.uid;
+    }
+
     window.setTab = (t) => {
         currentTab = t;
-        document.getElementById('tab-ch').classList.toggle('active', t === 'ch');
-        document.getElementById('tab-dm').classList.toggle('active', t === 'dm');
-        document.getElementById('action-btn').innerText = t === 'ch' ? 'Создать канал' : 'Добавить друга';
+        document.getElementById('tab-ch').className = `tab ${t==='ch'?'active':''}`;
+        document.getElementById('tab-dm').className = `tab ${t==='dm'?'active':''}`;
+        document.getElementById('action-btn').innerText = t==='ch'?'Создать канал':'Добавить по ID';
         renderSidebar();
     };
 
     window.handleAction = async () => {
         const val = document.getElementById('search-input').value.trim();
         if(currentTab === 'ch') {
-            const name = val || prompt("Имя канала:");
-            if(!name) return;
-            const cid = genID('ch');
-            await set(ref(db, 'rooms/' + cid), { name, owner: user.login });
+            const cid = 'ch_' + Math.random().toString(36).substr(2, 9);
+            await set(ref(db, 'rooms/' + cid), { name: val || "Канал", owner: user.login });
             await update(ref(db, `user_chats/${user.login}`), { [cid]: true });
         } else {
             const s = await get(ref(db, 'users'));
             let fLogin = '';
             s.forEach(u => { if(u.val().uid === val) fLogin = u.key; });
-            if(!fLogin || fLogin === user.login) return alert("Не найден");
-            const dmid = [user.login, fLogin].sort().join("___");
-            await update(ref(db, `user_chats/${user.login}`), { [dmid]: true });
-            await update(ref(db, `user_chats/${fLogin}`), { [dmid]: true });
+            if(fLogin && fLogin !== user.login) {
+                const dmid = [user.login, fLogin].sort().join("___");
+                await update(ref(db, `user_chats/${user.login}`), { [dmid]: true });
+                await update(ref(db, `user_chats/${fLogin}`), { [dmid]: true });
+            }
         }
         document.getElementById('search-input').value = '';
     };
 
     function renderSidebar() {
-        const box = document.getElementById('rooms-list');
-        box.innerHTML = '';
-        get(ref(db, `user_chats/${user.login}`)).then(snap => {
-            const data = snap.val() || {};
-            Object.keys(data).forEach(id => {
+        const box = document.getElementById('rooms-list'); box.innerHTML = '';
+        get(ref(db, `user_chats/${user.login}`)).then(s => {
+            const d = s.val() || {};
+            Object.keys(d).forEach(id => {
                 if(currentTab === 'ch' && id.startsWith('ch_')) {
-                    get(ref(db, 'rooms/' + id)).then(s => { if(s.exists()) createItem(id, s.val().name); });
+                    get(ref(db, 'rooms/'+id)).then(r => createItem(id, r.val().name));
                 } else if(currentTab === 'dm' && id.includes('___')) {
-                    createItem(id, id.replace(user.login, '').replace('___', ''));
+                    createItem(id, id.replace(user.login,'').replace('___',''));
                 }
             });
         });
@@ -209,115 +210,113 @@
 
     function createItem(id, name) {
         const div = document.createElement('div');
-        div.className = `item ${activeId === id ? 'active' : ''}`;
-        div.innerHTML = `<div class="av">${name[0].toUpperCase()}</div><b>${name}</b>`;
+        div.className = `item ${activeId===id?'active':''}`;
+        div.innerHTML = `<div class="av" style="background:#0088cc">${name[0].toUpperCase()}</div><b>${name}</b>`;
         div.onclick = () => selectChat(id, name);
         document.getElementById('rooms-list').appendChild(div);
     }
 
     function selectChat(id, name) {
-        activeId = id;
-        document.getElementById('h-name').innerText = name;
+        activeId = id; document.getElementById('h-name').innerText = name;
         document.getElementById('msg-input').disabled = false;
-        document.getElementById('call-init-btn').style.display = id.includes('___') ? 'block' : 'none';
-        
-        onValue(ref(db, id.includes('___') ? `dms/${id}` : `messages/${id}`), snap => {
-            const mBox = document.getElementById('messages');
-            mBox.innerHTML = '';
-            snap.forEach(m => {
+        document.getElementById('call-btn').style.display = id.includes('___') ? 'block' : 'none';
+        const path = id.includes('___') ? `dms/${id}` : `messages/${id}`;
+        onValue(ref(db, path), s => {
+            const box = document.getElementById('messages'); box.innerHTML = '';
+            s.forEach(m => {
                 const d = m.val();
                 const div = document.createElement('div');
                 div.className = `msg ${d.l === user.login ? 'sent' : ''}`;
-                div.innerHTML = `<b>${d.l}</b>${d.t}`;
-                mBox.appendChild(div);
+                let content = d.t;
+                if(d.type === 'file') content = `<a href="${d.t}" download style="color:cyan">📁 Файл: ${d.name}</a>`;
+                if(d.type === 'voice') content = `<audio src="${d.t}" controls style="width:200px"></audio>`;
+                div.innerHTML = `<b>${d.l}</b>${content}`;
+                box.appendChild(div);
             });
-            mBox.scrollTop = mBox.scrollHeight;
+            box.scrollTop = box.scrollHeight;
         });
     }
 
-    window.sendMsg = () => {
+    window.sendMsg = (extra = {}) => {
         const t = document.getElementById('msg-input').value.trim();
-        if(!t || !activeId) return;
-        push(ref(db, activeId.includes('___') ? `dms/${activeId}` : `messages/${activeId}`), { l: user.login, t });
+        if(!t && !extra.t) return;
+        const path = activeId.includes('___') ? `dms/${activeId}` : `messages/${activeId}`;
+        push(ref(db, path), { l: user.login, t: t || extra.t, ...extra });
         document.getElementById('msg-input').value = '';
     };
 
-    // --- AUDIO CALLS (WebRTC) ---
-    window.startCall = async () => {
-        document.getElementById('call-modal').style.display = 'flex';
-        document.getElementById('call-title').innerText = "Вызов...";
-        document.getElementById('call-user').innerText = activeId.replace(user.login,'').replace('___','');
-        
-        pc = new RTCPeerConnection(rtcConfig);
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-
-        pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${activeId}/candi`), e.candidate.toJSON());
-        pc.ontrack = e => document.getElementById('remote-audio').srcObject = e.streams[0];
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await set(ref(db, `calls/${activeId}/offer`), { sdp: offer.sdp, type: offer.type, from: user.login });
-
-        onValue(ref(db, `calls/${activeId}/answer`), async s => {
-            if(s.exists() && !pc.remoteDescription) await pc.setRemoteDescription(new RTCSessionDescription(s.val()));
-        });
-        onValue(ref(db, `calls/${activeId}/candi`), s => {
-            s.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c.val())));
-        });
+    // --- Files & Voice ---
+    window.uploadFile = () => {
+        const file = document.getElementById('file-input').files[0];
+        const reader = new FileReader();
+        reader.onload = () => sendMsg({ type: 'file', name: file.name, t: reader.result });
+        reader.readAsDataURL(file);
     };
 
-    function listenForCalls() {
-        onValue(ref(db, `calls`), snap => {
-            snap.forEach(call => {
-                const data = call.val();
-                if(call.key.includes(user.login) && data.offer && data.offer.from !== user.login) {
-                    showIncoming(call.key, data.offer);
+    window.startVoice = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => voiceChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(voiceChunks, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.onload = () => sendMsg({ type: 'voice', t: reader.result });
+            reader.readAsDataURL(blob);
+            voiceChunks = [];
+        };
+        mediaRecorder.start();
+        document.getElementById('voice-btn').style.color = 'red';
+    };
+    window.stopVoice = () => { mediaRecorder.stop(); document.getElementById('voice-btn').style.color = 'var(--gray)'; };
+
+    // --- Profile ---
+    window.openProfile = () => {
+        document.getElementById('modal-profile').style.display = 'flex';
+        document.getElementById('edit-name').value = user.name;
+        document.getElementById('edit-color').value = user.color;
+    };
+    window.saveProfile = async () => {
+        const name = document.getElementById('edit-name').value;
+        const color = document.getElementById('edit-color').value;
+        await update(ref(db, 'users/' + user.login), { name, color });
+        user.name = name; user.color = color;
+        updateUI(); closeModal();
+    };
+    window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.style.display='none');
+
+    // --- Calls ---
+    window.startCall = async () => {
+        document.getElementById('call-modal').style.display='flex';
+        pc = new RTCPeerConnection({ iceServers: [{urls:'stun:stun.l.google.com:19302'}] });
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+        pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${activeId}/c`), e.candidate.toJSON());
+        pc.ontrack = e => document.getElementById('remote-audio').srcObject = e.streams[0];
+        const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+        await set(ref(db, `calls/${activeId}/o`), { sdp: offer.sdp, type: offer.type, from: user.login });
+        onValue(ref(db, `calls/${activeId}/a`), async s => { if(s.exists()) await pc.setRemoteDescription(new RTCSessionDescription(s.val())); });
+    };
+
+    function listenCalls() {
+        onValue(ref(db, 'calls'), s => {
+            s.forEach(c => {
+                if(c.key.includes(user.login) && c.val().o && c.val().o.from !== user.login) {
+                    document.getElementById('call-modal').style.display='flex';
+                    document.getElementById('ans-btn').style.display='block';
+                    document.getElementById('ans-btn').onclick = async () => {
+                        pc = new RTCPeerConnection({ iceServers: [{urls:'stun:stun.l.google.com:19302'}] });
+                        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+                        pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${c.key}/c`), e.candidate.toJSON());
+                        pc.ontrack = e => document.getElementById('remote-audio').srcObject = e.streams[0];
+                        await pc.setRemoteDescription(new RTCSessionDescription(c.val().o));
+                        const a = await pc.createAnswer(); await pc.setLocalDescription(a);
+                        await set(ref(db, `calls/${c.key}/a`), { sdp: a.sdp, type: a.type });
+                    };
                 }
             });
         });
     }
-
-    async function showIncoming(id, offer) {
-        const modal = document.getElementById('call-modal');
-        modal.style.display = 'flex';
-        document.getElementById('call-title').innerText = "Входящий вызов";
-        document.getElementById('call-user').innerText = offer.from;
-        const ansBtn = document.getElementById('answer-btn');
-        ansBtn.style.display = 'block';
-
-        ansBtn.onclick = async () => {
-            pc = new RTCPeerConnection(rtcConfig);
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-
-            pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${id}/candi`), e.candidate.toJSON());
-            pc.ontrack = e => document.getElementById('remote-audio').srcObject = e.streams[0];
-
-            await pc.setRemoteDescription(new RTCSessionDescription(offer));
-            const ans = await pc.createAnswer();
-            await pc.setLocalDescription(ans);
-            await set(ref(db, `calls/${id}/answer`), { sdp: ans.sdp, type: ans.type });
-            
-            onValue(ref(db, `calls/${id}/candi`), s => s.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c.val()))));
-            ansBtn.style.display = 'none';
-            document.getElementById('call-title').innerText = "Разговор...";
-        };
-    }
-
-    document.getElementById('hangup-btn').onclick = () => {
-        if(pc) pc.close();
-        if(localStream) localStream.getTracks().forEach(t => t.stop());
-        if(activeId) remove(ref(db, `calls/${activeId}`));
-        location.reload(); 
-    };
-
-    window.openProfile = () => {
-        document.getElementById('modal-p').style.display='flex';
-        document.getElementById('p-uid').innerText = user.uid;
-    };
-    window.copyUID = () => { navigator.clipboard.writeText(user.uid); alert("ID Скопирован"); };
-
 </script>
 </body>
 </html>
