@@ -3,18 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Ultra Messenger</title>
+    <title>Cloud Messenger Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --bg: #0e1621; --side: #17212b; --blue: #0088cc; --text: #fff; --gray: #708499; --sent: #2b5278; --danger: #e74c3c; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
         
-        /* Auth */
         #auth-screen { position: fixed; inset: 0; background: var(--bg); z-index: 10000; display: flex; align-items: center; justify-content: center; }
         .auth-card { background: var(--side); padding: 30px; border-radius: 20px; width: 320px; text-align: center; }
         .auth-card input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #242f3d; background: #0e1621; color: white; }
         
-        /* Sidebar */
         .sidebar { width: 320px; background: var(--side); display: flex; flex-direction: column; border-right: 1px solid #000; }
         .tabs { display: flex; background: #1c2733; }
         .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; color: var(--gray); font-weight: bold; }
@@ -22,20 +20,20 @@
         .rooms-list { flex: 1; overflow-y: auto; }
         .item { padding: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid #1c2733; }
         .item.active { background: var(--sent); }
-        .av { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
+        .av { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; color: white; }
 
-        /* Chat */
         .chat-area { flex: 1; display: flex; flex-direction: column; background: #0e1621; }
         #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
         .msg { max-width: 75%; padding: 10px; border-radius: 12px; background: #182533; position: relative; }
         .msg.sent { align-self: flex-end; background: var(--sent); }
         .msg b { display: block; font-size: 12px; color: var(--blue); margin-bottom: 4px; }
+        .status { font-size: 10px; float: right; margin-top: 5px; margin-left: 8px; color: var(--gray); }
+        .status.read { color: #2ecc71; }
         
         .input-bar { padding: 15px; background: var(--side); display: flex; align-items: center; gap: 10px; }
         .input-bar input { flex: 1; background: #0e1621; border: none; padding: 12px; border-radius: 20px; color: white; }
         .icon-btn { background: none; border: none; color: var(--gray); font-size: 20px; cursor: pointer; }
 
-        /* Modal */
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 11000; align-items: center; justify-content: center; }
         .modal-box { background: var(--side); width: 320px; padding: 25px; border-radius: 20px; text-align: center; }
         .btn { border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
@@ -46,12 +44,10 @@
 
 <div id="auth-screen">
     <div class="auth-card">
-        <h2>Cloud Ultra</h2>
+        <h2>Cloud Messenger</h2>
         <input type="text" id="a-login" placeholder="Логин">
         <input type="password" id="a-pass" placeholder="Пароль">
-        <label style="font-size: 13px; color: var(--gray); cursor: pointer;">
-            <input type="checkbox" id="a-rem" checked> Запомнить меня
-        </label>
+        <label style="font-size: 13px; color: var(--gray);"><input type="checkbox" id="a-rem" checked> Запомнить меня</label>
         <button class="btn btn-blue" onclick="auth('login')">ВОЙТИ</button>
         <button class="btn" style="background:none; color:var(--gray)" onclick="auth('reg')">Регистрация</button>
     </div>
@@ -63,13 +59,13 @@
         <div class="tab" id="tab-dm" onclick="setTab('dm')">ЛИЧНЫЕ</div>
     </div>
     <div style="padding: 10px;">
-        <input type="text" id="search-input" placeholder="ID друга или канала..." style="width:100%; padding:10px; background:#0e1621; border:none; border-radius:10px; color:white;">
+        <input type="text" id="search-input" placeholder="ID друга или название..." style="width:100%; padding:10px; background:#0e1621; border:none; border-radius:10px; color:white;">
         <button class="btn btn-blue" onclick="handleAction()" id="action-btn">Создать канал</button>
     </div>
     <div class="rooms-list" id="rooms-list"></div>
     <div style="padding:15px; border-top:1px solid #000; display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="openProfile()">
-        <div class="av" id="my-av" style="background:var(--blue)">?</div>
-        <div style="flex:1"><b id="my-display-name">...</b><div style="font-size:10px; color:var(--gray)" id="my-id-show">ID</div></div>
+        <div class="av" id="my-av">?</div>
+        <div style="flex:1"><b id="my-display-name">...</b><div style="font-size:10px; color:var(--gray)" id="my-id-show">Загрузка...</div></div>
     </div>
 </div>
 
@@ -80,19 +76,16 @@
     </div>
     <div id="messages"></div>
     <div class="input-bar">
-        <input type="file" id="file-input" style="display:none" onchange="uploadFile()">
-        <button class="icon-btn" onclick="document.getElementById('file-input').click()"><i class="fa fa-paperclip"></i></button>
         <input type="text" id="msg-input" placeholder="Сообщение..." disabled>
-        <button class="icon-btn" id="voice-btn" onmousedown="startVoice()" onmouseup="stopVoice()"><i class="fa fa-microphone"></i></button>
         <button class="icon-btn" style="color:var(--blue)" onclick="sendMsg()"><i class="fa fa-paper-plane"></i></button>
     </div>
 </div>
 
 <div class="modal" id="modal-profile">
     <div class="modal-box">
-        <h3>Профиль</h3>
-        <input type="text" id="edit-name" placeholder="Отображаемое имя">
-        <input type="text" id="edit-color" placeholder="Цвет аватарки (например, orange)">
+        <h3>Настройки</h3>
+        <input type="text" id="edit-name" placeholder="Имя">
+        <input type="text" id="edit-color" placeholder="Цвет (например, #ff5722)">
         <button class="btn btn-blue" onclick="saveProfile()">Сохранить</button>
         <button class="btn" style="background:var(--danger); color:white" onclick="logout()">Выйти</button>
         <button class="btn" style="background:none; color:white" onclick="closeModal()">Закрыть</button>
@@ -102,11 +95,10 @@
 <div class="modal" id="call-modal">
     <div class="modal-box">
         <h2 id="call-status">Звонок...</h2>
-        <p id="call-target"></p>
         <audio id="remote-audio" autoplay></audio>
         <div style="display:flex; gap:10px;">
-            <button class="btn" id="ans-btn" style="background:#2ecc71; display:none">Принять</button>
-            <button class="btn" style="background:var(--danger)" onclick="location.reload()">Сброс</button>
+            <button class="btn" id="ans-btn" style="background:#2ecc71; display:none">Ответить</button>
+            <button class="btn" style="background:var(--danger)" onclick="endCall()">Сбросить</button>
         </div>
     </div>
 </div>
@@ -119,9 +111,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    let user = null, activeId = null, currentTab = 'ch';
-    let mediaRecorder, voiceChunks = [];
-    let pc, localStream;
+    let user = null, activeId = null, currentTab = 'ch', pc, localStream;
 
     // --- Auth ---
     window.auth = async (type) => {
@@ -129,41 +119,36 @@
         const p = document.getElementById('a-pass').value.trim();
         const rem = document.getElementById('a-rem').checked;
         if(!l || !p) return;
-
         if(type === 'reg') {
-            const uid = 'u_' + Math.random().toString(36).substr(2, 9);
+            const uid = 'u_' + Math.random().toString(36).substr(2, 6);
             await set(ref(db, 'users/' + l), { pass: p, uid, name: l, color: '#0088cc' });
-            alert("Успешно!");
+            alert("Зарегистрировано!");
         } else {
             const s = await get(ref(db, 'users/' + l));
             if(s.exists() && s.val().pass === p) {
                 user = { login: l, ...s.val() };
-                if(rem) localStorage.setItem('cloud_user', JSON.stringify({l, p}));
+                if(rem) localStorage.setItem('cloud_sess', JSON.stringify({l, p}));
                 document.getElementById('auth-screen').style.display = 'none';
                 startApp();
-            } else alert("Ошибка");
+            } else alert("Ошибка входа");
         }
     };
 
     window.logout = () => { localStorage.clear(); location.reload(); };
-    const saved = localStorage.getItem('cloud_user');
-    if(saved) { 
-        const d = JSON.parse(saved); 
-        document.getElementById('a-login').value=d.l; 
-        document.getElementById('a-pass').value=d.p; 
-        window.auth('login'); 
-    }
+    const saved = localStorage.getItem('cloud_sess');
+    if(saved) { const d = JSON.parse(saved); document.getElementById('a-login').value=d.l; document.getElementById('a-pass').value=d.p; window.auth('login'); }
 
     function startApp() {
         updateUI();
-        onValue(ref(db, `user_chats/${user.login}`), () => renderSidebar());
+        onValue(ref(db, `user_chats/${user.login}`), renderSidebar);
         listenCalls();
     }
 
     function updateUI() {
         document.getElementById('my-display-name').innerText = user.name || user.login;
-        document.getElementById('my-av').innerText = (user.name || user.login)[0].toUpperCase();
-        document.getElementById('my-av').style.background = user.color || '#0088cc';
+        const av = document.getElementById('my-av');
+        av.innerText = (user.name || user.login)[0].toUpperCase();
+        av.style.background = user.color || '#0088cc';
         document.getElementById('my-id-show').innerText = "ID: " + user.uid;
     }
 
@@ -171,15 +156,16 @@
         currentTab = t;
         document.getElementById('tab-ch').className = `tab ${t==='ch'?'active':''}`;
         document.getElementById('tab-dm').className = `tab ${t==='dm'?'active':''}`;
-        document.getElementById('action-btn').innerText = t==='ch'?'Создать канал':'Добавить по ID';
+        document.getElementById('action-btn').innerText = t==='ch'?'Создать канал':'Добавить друга';
         renderSidebar();
     };
 
     window.handleAction = async () => {
         const val = document.getElementById('search-input').value.trim();
+        if(!val) return;
         if(currentTab === 'ch') {
-            const cid = 'ch_' + Math.random().toString(36).substr(2, 9);
-            await set(ref(db, 'rooms/' + cid), { name: val || "Канал", owner: user.login });
+            const cid = 'ch_' + Math.random().toString(36).substr(2, 6);
+            await set(ref(db, 'rooms/' + cid), { name: val, owner: user.login });
             await update(ref(db, `user_chats/${user.login}`), { [cid]: true });
         } else {
             const s = await get(ref(db, 'users'));
@@ -200,18 +186,19 @@
             const d = s.val() || {};
             Object.keys(d).forEach(id => {
                 if(currentTab === 'ch' && id.startsWith('ch_')) {
-                    get(ref(db, 'rooms/'+id)).then(r => createItem(id, r.val().name));
+                    get(ref(db, 'rooms/'+id)).then(r => createItem(id, r.val().name, '#0088cc'));
                 } else if(currentTab === 'dm' && id.includes('___')) {
-                    createItem(id, id.replace(user.login,'').replace('___',''));
+                    const friend = id.replace(user.login,'').replace('___','');
+                    get(ref(db, 'users/'+friend)).then(u => createItem(id, u.val().name || friend, u.val().color));
                 }
             });
         });
     }
 
-    function createItem(id, name) {
+    function createItem(id, name, color) {
         const div = document.createElement('div');
         div.className = `item ${activeId===id?'active':''}`;
-        div.innerHTML = `<div class="av" style="background:#0088cc">${name[0].toUpperCase()}</div><b>${name}</b>`;
+        div.innerHTML = `<div class="av" style="background:${color || '#0088cc'}">${name[0].toUpperCase()}</div><b>${name}</b>`;
         div.onclick = () => selectChat(id, name);
         document.getElementById('rooms-list').appendChild(div);
     }
@@ -220,61 +207,32 @@
         activeId = id; document.getElementById('h-name').innerText = name;
         document.getElementById('msg-input').disabled = false;
         document.getElementById('call-btn').style.display = id.includes('___') ? 'block' : 'none';
+        
         const path = id.includes('___') ? `dms/${id}` : `messages/${id}`;
         onValue(ref(db, path), s => {
             const box = document.getElementById('messages'); box.innerHTML = '';
             s.forEach(m => {
                 const d = m.val();
+                if(d.l !== user.login && !d.read) update(ref(db, `${path}/${m.key}`), { read: true });
                 const div = document.createElement('div');
                 div.className = `msg ${d.l === user.login ? 'sent' : ''}`;
-                let content = d.t;
-                if(d.type === 'file') content = `<a href="${d.t}" download style="color:cyan">📁 Файл: ${d.name}</a>`;
-                if(d.type === 'voice') content = `<audio src="${d.t}" controls style="width:200px"></audio>`;
-                div.innerHTML = `<b>${d.l}</b>${content}`;
+                const check = d.l === user.login ? `<span class="status ${d.read?'read':''}">${d.read?'✓✓':'✓'}</span>` : '';
+                div.innerHTML = `<b>${d.l}</b>${d.t}${check}`;
                 box.appendChild(div);
             });
             box.scrollTop = box.scrollHeight;
         });
     }
 
-    window.sendMsg = (extra = {}) => {
+    window.sendMsg = () => {
         const t = document.getElementById('msg-input').value.trim();
-        if(!t && !extra.t) return;
+        if(!t || !activeId) return;
         const path = activeId.includes('___') ? `dms/${activeId}` : `messages/${activeId}`;
-        push(ref(db, path), { l: user.login, t: t || extra.t, ...extra });
+        push(ref(db, path), { l: user.login, t, read: false });
         document.getElementById('msg-input').value = '';
     };
 
-    // --- Files & Voice ---
-    window.uploadFile = () => {
-        const file = document.getElementById('file-input').files[0];
-        const reader = new FileReader();
-        reader.onload = () => sendMsg({ type: 'file', name: file.name, t: reader.result });
-        reader.readAsDataURL(file);
-    };
-
-    window.startVoice = async () => {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => voiceChunks.push(e.data);
-        mediaRecorder.onstop = () => {
-            const blob = new Blob(voiceChunks, { type: 'audio/webm' });
-            const reader = new FileReader();
-            reader.onload = () => sendMsg({ type: 'voice', t: reader.result });
-            reader.readAsDataURL(blob);
-            voiceChunks = [];
-        };
-        mediaRecorder.start();
-        document.getElementById('voice-btn').style.color = 'red';
-    };
-    window.stopVoice = () => { mediaRecorder.stop(); document.getElementById('voice-btn').style.color = 'var(--gray)'; };
-
-    // --- Profile ---
-    window.openProfile = () => {
-        document.getElementById('modal-profile').style.display = 'flex';
-        document.getElementById('edit-name').value = user.name;
-        document.getElementById('edit-color').value = user.color;
-    };
+    window.openProfile = () => { document.getElementById('modal-profile').style.display = 'flex'; };
     window.saveProfile = async () => {
         const name = document.getElementById('edit-name').value;
         const color = document.getElementById('edit-color').value;
@@ -317,6 +275,7 @@
             });
         });
     }
+    window.endCall = () => { if(pc) pc.close(); remove(ref(db, 'calls/'+activeId)); location.reload(); };
 </script>
 </body>
 </html>
