@@ -50,6 +50,8 @@
     </div>
     <div id="messages"></div>
     <div class="input-bar">
+        <button class="icon-btn" id="attach-file-btn"><i class="fa fa-paperclip"></i></button> <!-- Кнопка для вложений -->
+        <input type="file" id="file-input" style="display: none;" accept="image/*,audio/*,video/*"> <!-- Скрытый инпут для файлов -->
         <button class="icon-btn" id="voice-record-btn"><i class="fa fa-microphone"></i></button>
         <input type="text" id="msg-input" placeholder="Сообщение..." disabled>
         <button class="icon-btn" style="color:var(--blue)" id="send-msg-btn"><i class="fa fa-paper-plane"></i></button>
@@ -86,14 +88,12 @@
     // Импорты Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getDatabase, ref, push, onValue, set, get, update, remove } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
-    // Добавлен импорт для Firebase Storage
     import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 
     // Инициализация Firebase
     const firebaseConfig = { databaseURL: "https://maxi-b3761-default-rtdb.firebaseio.com" };
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    // Инициализация Firebase Storage
     const storage = getStorage(app);
 
     // Все ваши переменные и функции
@@ -101,6 +101,7 @@
     let pc, localStream;
     const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     let isMuted = false;
+    let currentIncomingCallListenerFn = null; // Для очистки слушателя входящих звонков
 
     const genID = (pre) => pre + '_' + Math.random().toString(36).substr(2, 9);
     const getEl = (id) => document.getElementById(id);
@@ -124,7 +125,8 @@
                 const uid = genID('u');
                 await set(ref(db, 'users/' + l), { pass: p, uid: uid });
                 alert("Регистрация успешна! Теперь вы можете войти.");
-                getEl('a-pass').value = '';
+                const aPass = getEl('a-pass');
+                if (aPass) aPass.value = '';
             } else {
                 const snapshot = await get(ref(db, 'users/' + l));
                 if(snapshot.exists() && snapshot.val().pass === p) {
@@ -134,11 +136,13 @@
                         await update(ref(db, 'users/'+l), {uid: user.uid});
                     }
                     localStorage.setItem('cloud_v10', JSON.stringify({l, p}));
-                    getEl('auth-screen').style.display = 'none';
+                    const authScreen = getEl('auth-screen');
+                    if (authScreen) authScreen.style.display = 'none';
                     startApp();
                 } else {
                     alert("Неверный логин или пароль.");
-                    getEl('a-pass').value = '';
+                    const aPass = getEl('a-pass');
+                    if (aPass) aPass.value = '';
                 }
             }
         } catch (error) {
@@ -150,30 +154,36 @@
     function logout() { localStorage.clear(); location.reload(); }
 
     function startApp() {
-        getEl('my-name').innerText = user.login;
-        getEl('my-av').innerText = user.login[0].toUpperCase();
+        const myName = getEl('my-name');
+        if (myName) myName.innerText = user.login;
+
+        const myAv = getEl('my-av');
+        if (myAv) myAv.innerText = user.login[0].toUpperCase();
+
         onValue(ref(db, `user_chats/${user.login}`), () => renderSidebar());
         listenForCalls();
         renderSidebar();
-        getEl('auth-screen').style.display = 'none';
-
-        // Пример: Если пользователь админ, показать какую-то админскую кнопку
-        if (user.role === 'admin') {
-            console.log("Администратор вошел в систему!");
-            // getEl('admin-panel-button').style.display = 'block'; // Если есть такая кнопка
-        }
+        const authScreen = getEl('auth-screen');
+        if (authScreen) authScreen.style.display = 'none';
     }
 
     function setTab(t) {
         currentTab = t;
-        getEl('tab-ch').classList.toggle('active', t === 'ch');
-        getEl('tab-dm').classList.toggle('active', t === 'dm');
-        getEl('action-btn').innerText = t === 'ch' ? 'Создать канал' : 'Найти по ID';
+        const tabCh = getEl('tab-ch');
+        if (tabCh) tabCh.classList.toggle('active', t === 'ch');
+
+        const tabDm = getEl('tab-dm');
+        if (tabDm) tabDm.classList.toggle('active', t === 'dm');
+
+        const actionBtn = getEl('action-btn');
+        if (actionBtn) actionBtn.innerText = t === 'ch' ? 'Создать канал' : 'Найти по ID';
         renderSidebar();
     }
 
     async function handleAction() {
-        const val = getEl('search-input').value.trim();
+        const searchInput = getEl('search-input');
+        const val = searchInput ? searchInput.value.trim() : '';
+
         if(currentTab === 'ch') {
             const name = val || prompt("Введите название канала:");
             if(!name) return;
@@ -208,12 +218,16 @@
             await update(ref(db, `user_chats/${friendLogin}`), { [dmid]: true });
             alert(`Чат с пользователем ${friendLogin} добавлен.`);
         }
-        getEl('search-input').value = '';
+        if (searchInput) searchInput.value = '';
         renderSidebar();
     }
 
     function renderSidebar() {
         const box = getEl('rooms-list');
+        if (!box) {
+            console.warn("Элемент 'rooms-list' не найден.");
+            return;
+        }
         box.innerHTML = '';
         get(ref(db, `user_chats/${user.login}`)).then(snap => {
             const data = snap.val() || {};
@@ -223,7 +237,7 @@
 
             chatIds.forEach(id => {
                 if(id.startsWith('ch_')) {
-                    getref(db, 'rooms/' + id).then(s => {
+                    get(ref(db, 'rooms/' + id)).then(s => {
                         if(s.exists()) createItem(id, s.val().name);
                     }).catch(e => console.error("Ошибка загрузки канала:", e));
                 } else if(id.includes('___')) {
@@ -234,12 +248,18 @@
         }).catch(e => console.error("Ошибка загрузки пользовательских чатов:", e));
     }
 
-    function createItem(id, name) { /* ... без изменений ... */ }
+    function createItem(id, name) {
+        const div = document.createElement('div');
+        div.className = `item ${activeId === id ? 'active' : ''}`;
+        div.setAttribute('data-chat-id', id);
+        div.innerHTML = `<div class="av">${name[0].toUpperCase()}</div><b>${name}</b>`;
+        div.addEventListener('click', () => selectChat(id, name));
+        const roomsList = getEl('rooms-list');
+        if (roomsList) roomsList.appendChild(div);
+    }
 
     let unsubscribeMessages = null;
-    let currentFileUpload = null; // Для отслеживания текущей загрузки файла
 
-    // Изменена функция selectChat, чтобы убедиться, что сообщения с файлами правильно отображаются
     function selectChat(id, name) {
         if (activeId === id) return;
 
@@ -256,8 +276,11 @@
         }
 
         activeId = id;
-        getEl('h-name').innerText = name;
-        getEl('msg-input').disabled = false;
+        const hName = getEl('h-name');
+        if (hName) hName.innerText = name;
+
+        const msgInput = getEl('msg-input');
+        if (msgInput) msgInput.disabled = false;
         
         const callInitBtn = getEl('call-init-btn');
         if (callInitBtn) {
@@ -266,6 +289,10 @@
 
         const chatPath = id.includes('___') ? `dms/${id}` : `messages/${id}`;
         const mBox = getEl('messages');
+        if (!mBox) {
+            console.warn("Элемент 'messages' не найден.");
+            return;
+        }
         mBox.innerHTML = '';
 
         unsubscribeMessages = onValue(ref(db, chatPath), snap => {
@@ -282,13 +309,13 @@
                         contentHTML += `<img src="${d.fileUrl}" alt="Изображение" loading="lazy">`;
                     } else if (d.fileType && d.fileType.startsWith('audio/')) {
                         contentHTML += `<audio controls src="${d.fileUrl}"></audio>`;
-                    } else if (d.fileType && d.fileType.startsWith('video/')) { // Опционально: добавление видео
+                    } else if (d.fileType && d.fileType.startsWith('video/')) {
                         contentHTML += `<video controls src="${d.fileUrl}"></video>`;
                     } else {
                         contentHTML += `<a href="${d.fileUrl}" target="_blank" rel="noopener noreferrer">${d.fileName || 'Файл'} <i class="fa fa-download"></i></a>`;
                     }
                 }
-                if (d.t) { // Если есть текстовое сообщение
+                if (d.t) {
                     contentHTML += `<span>${d.t}</span>`;
                 }
                 if (d.status === 'uploading') {
@@ -306,9 +333,8 @@
         }
     }
 
-    // Новая функция для сжатия изображения
     function compressImage(file, maxWidth, maxHeight, quality) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (event) => {
                 const img = new Image();
@@ -333,27 +359,35 @@
                     canvas.width = width;
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        return reject(new Error("Не удалось получить 2D контекст канваса."));
+                    }
                     ctx.drawImage(img, 0, 0, width, height);
 
                     canvas.toBlob((blob) => {
-                        resolve(blob);
+                        if (blob) {
+                            resolve(blob);
+                        } else {
+                            reject(new Error("Ошибка при создании Blob из канваса."));
+                        }
                     }, file.type, quality);
                 };
+                img.onerror = () => reject(new Error("Ошибка загрузки изображения в Canvas."));
             };
+            reader.onerror = () => reject(new Error("Ошибка чтения файла."));
             reader.readAsDataURL(file);
         });
     }
 
-    // Изменена функция sendMsg для отправки файлов
     async function sendMsg() {
         const msgInput = getEl('msg-input');
         const fileInput = getEl('file-input');
-        const text = msgInput.value.trim();
-        const file = fileInput?.files[0];
+        const text = msgInput ? msgInput.value.trim() : '';
+        const file = fileInput ? fileInput.files[0] : null;
 
         if ((!text && !file) || !activeId) return;
 
-        msgInput.value = ''; // Очищаем текстовое поле сразу
+        if (msgInput) msgInput.value = '';
         
         const chatPath = activeId.includes('___') ? `dms/${activeId}` : `messages/${activeId}`;
         let fileUrl = null;
@@ -364,24 +398,27 @@
             fileName = file.name;
             fileType = file.type;
             
-            // Если это изображение, пытаемся сжать
             let fileToUpload = file;
             if (fileType.startsWith('image/')) {
-                // Сжимаем до 800px по широкой стороне с качеством 0.8
-                fileToUpload = await compressImage(file, 800, 800, 0.8);
+                try {
+                    fileToUpload = await compressImage(file, 800, 800, 0.8);
+                } catch (error) {
+                    console.error("Ошибка сжатия изображения:", error);
+                    alert("Ошибка при сжатии изображения. Отправка оригинального.");
+                    fileToUpload = file; // Отправляем оригинал, если сжатие не удалось
+                }
             }
 
             const uniqueFileName = `${user.login}_${Date.now()}_${fileName}`;
             const fileStorageRef = storageRef(storage, `chat_files/${activeId}/${uniqueFileName}`);
             
-            // Создаем сообщение-заглушку в БД со статусом "загрузка"
             const tempMessageRef = push(ref(db, chatPath));
             await set(tempMessageRef, {
                 l: user.login,
                 t: text || '',
                 fileName: fileName,
                 fileType: fileType,
-                status: 'uploading', // Статус загрузки
+                status: 'uploading',
                 timestamp: Date.now()
             });
 
@@ -389,38 +426,34 @@
             
             uploadTask.on('state_changed',
                 (snapshot) => {
-                    // Можно показывать прогресс загрузки в UI, если нужно
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                     console.log('Upload is ' + progress + '% done');
                 },
                 (error) => {
                     console.error("Ошибка загрузки файла:", error);
-                    // Удалить или изменить статус сообщения-заглушки при ошибке
                     update(tempMessageRef, { status: 'failed', errorMessage: error.message });
                     alert("Ошибка при загрузке файла.");
                 },
                 () => { // Успешная загрузка
                     getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
                         fileUrl = downloadURL;
-                        // Обновляем сообщение в БД с реальной ссылкой и статусом "отправлено"
                         await update(tempMessageRef, {
                             fileUrl: fileUrl,
                             status: 'sent',
-                            timestamp: Date.now() // Обновим timestamp, чтобы сообщение было актуальным
+                            timestamp: Date.now()
                         });
-                        fileInput.value = ''; // Сбрасываем выбранный файл
+                        if (fileInput) fileInput.value = '';
                     });
                 }
             );
         } else {
-            // Если файла нет, отправляем только текстовое сообщение
             push(ref(db, chatPath), { l: user.login, t: text, timestamp: Date.now() });
         }
     }
 
     function toggleSidebar() {
         const sidebar = getEl('sidebar');
-        sidebar.classList.toggle('active');
+        if (sidebar) sidebar.classList.toggle('active');
     }
 
     async function startCall() {
@@ -434,13 +467,15 @@
         const callUser = getEl('call-user');
         const hangupBtn = getEl('hangup-btn');
         const answerBtn = getEl('answer-btn');
-        const muteToggleBtn = getEl('mute-toggle-btn');
+        // muteToggleBtn привязан глобально
+        const remoteAudio = getEl('remote-audio');
 
-        callModal.style.display = 'flex';
-        callTitle.innerText = "Вызов...";
-        callUser.innerText = activeId.replace(user.login,'').replace('___','');
-        answerBtn.style.display = 'none';
-        hangupBtn.style.display = 'block';
+
+        if (callModal) callModal.style.display = 'flex';
+        if (callTitle) callTitle.innerText = "Вызов...";
+        if (callUser) callUser.innerText = activeId.replace(user.login,'').replace('___','');
+        if (answerBtn) answerBtn.style.display = 'none';
+        if (hangupBtn) hangupBtn.style.display = 'block';
 
         try {
             pc = new RTCPeerConnection(rtcConfig);
@@ -448,27 +483,27 @@
             localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
             pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${activeId}/candi`), e.candidate.toJSON());
-            pc.ontrack = e => getEl('remote-audio').srcObject = e.streams[0];
+            pc.ontrack = e => { if (remoteAudio) remoteAudio.srcObject = e.streams[0]; };
 
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             await set(ref(db, `calls/${activeId}/offer`), { sdp: offer.sdp, type: offer.type, from: user.login });
 
             onValue(ref(db, `calls/${activeId}/answer`), async s => {
-                if(s.exists() && s.val().type === 'answer' && pc.signalingState !== 'closed' && !pc.remoteDescription) {
+                if(s.exists() && s.val().type === 'answer' && pc && pc.signalingState !== 'closed' && !pc.remoteDescription) {
                     await pc.setRemoteDescription(new RTCSessionDescription(s.val()));
-                    callTitle.innerText = "Разговор...";
+                    if (callTitle) callTitle.innerText = "Разговор...";
                 }
             });
             onValue(ref(db, `calls/${activeId}/candi`), s => {
                 s.forEach(c => {
                     const candidate = new RTCIceCandidate(c.val());
-                    pc.addIceCandidate(candidate).catch(e => console.warn("Error adding ICE candidate:", e));
+                    if (pc) pc.addIceCandidate(candidate).catch(e => console.warn("Error adding ICE candidate:", e));
                 });
             });
 
             onValue(ref(db, `calls/${activeId}`), (snapshot) => {
-                if (!snapshot.exists()) {
+                if (snapshot.val() === null && activeId) { // Если нода звонка удалена
                     stopCallAndReset();
                     alert("Звонок завершён другой стороной.");
                 }
@@ -479,17 +514,25 @@
             alert("Не удалось начать звонок. Убедитесь, что у вас есть микрофон и вы дали разрешение.");
             stopCallAndReset();
         }
-
-        // Mute toggle handled globally
     }
 
     function listenForCalls() {
-        onValue(ref(db, `calls`), snap => {
+        if (currentIncomingCallListenerFn) {
+            currentIncomingCallListenerFn(); // Отписываемся от старого
+            currentIncomingCallListenerFn = null;
+        }
+
+        currentIncomingCallListenerFn = onValue(ref(db, `calls`), snap => {
             snap.forEach(call => {
                 const data = call.val();
-                if(call.key.includes(user.login) && data.offer && data.offer.from !== user.login) {
-                    if (activeId !== call.key && getEl('call-modal').style.display !== 'flex') {
-                           showIncoming(call.key, data.offer);
+                if(call.key.includes(user.login) && data.offer && data.offer.from !== user.login &&
+                   getEl('call-modal').style.display !== 'flex' && activeId !== call.key)
+                {
+                    showIncoming(call.key, data.offer);
+                } else if (!data) { // Если кто-то из звонка удалил его у нас
+                    if (activeId === call.key) {
+                        stopCallAndReset();
+                        alert("Звонок завершён (удален из БД).");
                     }
                 }
             });
@@ -502,44 +545,55 @@
         const callUser = getEl('call-user');
         const ansBtn = getEl('answer-btn');
         const hangupBtn = getEl('hangup-btn');
-        const muteToggleBtn = getEl('mute-toggle-btn');
+        const remoteAudio = getEl('remote-audio');
         
-        if (callModal.style.display === 'flex' && activeId) {
-            await remove(ref(db, `calls/${id}`));
+        if (callModal && callModal.style.display === 'flex' && activeId) {
+            if (id !== activeId) { // Отклонить, если уже в звонке или обрабатываем другой
+                await remove(ref(db, `calls/${id}`));
+            }
             return;
         }
 
-        callModal.style.display = 'flex';
-        callTitle.innerText = "Входящий вызов";
-        callUser.innerText = offer.from;
-        ansBtn.style.display = 'block';
-        hangupBtn.style.display = 'block';
+        if (callModal) callModal.style.display = 'flex';
+        if (callTitle) callTitle.innerText = "Входящий вызов";
+        if (callUser) callUser.innerText = offer.from;
+        if (ansBtn) ansBtn.style.display = 'block';
+        if (hangupBtn) hangupBtn.style.display = 'block';
 
         activeId = id;
 
-        ansBtn.addEventListener('click', async function ansClickHandler() {
+        // Удалить старые обработчики, чтобы избежать дублирования
+        const oldAnsClickHandler = ansBtn ? ansBtn._ansClickHandler : null;
+        if (ansBtn && oldAnsClickHandler) {
+            ansBtn.removeEventListener('click', oldAnsClickHandler);
+        }
+
+        async function ansClickHandler() {
             try {
                 pc = new RTCPeerConnection(rtcConfig);
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
                 pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${id}/candi`), e.candidate.toJSON());
-                pc.ontrack = e => getEl('remote-audio').srcObject = e.streams[0];
+                pc.ontrack = e => { if (remoteAudio) remoteAudio.srcObject = e.streams[0]; };
                 
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
                 const ans = await pc.createAnswer();
                 await pc.setLocalDescription(ans);
                 await set(ref(db, `calls/${id}/answer`), { sdp: ans.sdp, type: ans.type });
                 
-                onValueref(db, `calls/${id}/candi`), s => s.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c.val())).catch(e => console.warn("Error adding ICE candidate:", e)));
+                onValue(ref(db, `calls/${id}/candi`), s => s.forEach(c => {
+                    if (pc) pc.addIceCandidate(new RTCIceCandidate(c.val())).catch(e => console.warn("Error adding ICE candidate:", e));
+                }));
                 
-                ansBtn.style.display = 'none';
-                callTitle.innerText = "Разговор...";
+                if (ansBtn) ansBtn.style.display = 'none';
+                if (callTitle) callTitle.innerText = "Разговор...";
 
-                ansBtn.removeEventListener('click', ansClickHandler);
+                // Удаляем этот конкретный обработчик после его использования
+                if (ansBtn) ansBtn.removeEventListener('click', ansClickHandler);
 
                 onValue(ref(db, `calls/${id}`), (snapshot) => {
-                    if (!snapshot.exists()) {
+                    if (snapshot.val() === null && activeId) {
                         stopCallAndReset();
                         alert("Звонок завершён другой стороной.");
                     }
@@ -550,9 +604,24 @@
                 alert("Не удалось принять звонок. Убедитесь, что у вас есть микрофон.");
                 stopCallAndReset();
             }
-        });
+        }
+        if (ansBtn) {
+            ansBtn.addEventListener('click', ansClickHandler);
+            ansBtn._ansClickHandler = ansClickHandler; // Сохраняем ссылку на обработчик для удаления
+        }
+    }
 
-        // Mute toggle handled globally
+    // Глобальная функция для переключения mute
+    function toggleMute() {
+        if (localStream) {
+            isMuted = !isMuted;
+            localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+            const muteToggleBtn = getEl('mute-toggle-btn');
+            if (muteToggleBtn) {
+                 muteToggleBtn.classList.toggle('active', isMuted);
+                 muteToggleBtn.querySelector('i').className = isMuted ? 'fa fa-microphone-slash' : 'fa fa-microphone';
+            }
+        }
     }
 
     function stopCallAndReset() {
@@ -568,24 +637,49 @@
         const muteToggleBtn = getEl('mute-toggle-btn');
         if (muteToggleBtn) {
             muteToggleBtn.classList.remove('active');
-            muteToggleBtn.querySelector('i').className = 'fa fa-microphone';
+            const icon = muteToggleBtn.querySelector('i');
+            if (icon) icon.className = 'fa fa-microphone';
         }
 
-        if(activeId && getEl('call-modal').style.display === 'flex') {
-            removeref(db, `calls/${activeId}`).catch(e => console.error("Ошибка удаления данных звонка:", e));
+        if (activeId) {
+            // Исправлено: .catch() вызывается на результате remove(), который возвращает Promise
+            remove(ref(db, `calls/${activeId}`))
+                .catch(e => console.error("Ошибка удаления данных звонка:", e));
         }
 
-        getEl('call-modal').style.display = 'none';
-        getEl('remote-audio').srcObject = null;
-        activeId = null;
+        const callModal = getEl('call-modal');
+        if (callModal) callModal.style.display = 'none';
+        
+        const remoteAudio = getEl('remote-audio');
+        if (remoteAudio) remoteAudio.srcObject = null;
+        
+        activeId = null; 
+
+        if (currentIncomingCallListenerFn) {
+            currentIncomingCallListenerFn();
+            currentIncomingCallListenerFn = null;
+        }
     }
 
     function openProfile() {
-        getEl('modal-p').style.display='flex';
-        getEl('p-uid').innerText = user.uid;
+        const modalP = getEl('modal-p');
+        if (modalP) modalP.style.display='flex';
+        const pUid = getEl('p-uid');
+        if (pUid && user) pUid.innerText = user.uid;
     }
-    function copyUID() { navigator.clipboard.writeText(user.uid); alert("ID Скопирован"); }
-    function closeProfileModal() { getEl('modal-p').style.display='none'; }
+    function copyUID() { 
+        if (user && user.uid) {
+            navigator.clipboard.writeText(user.uid); 
+            alert("ID Скопирован"); 
+        } else {
+            alert("Нет доступного ID для копирования.");
+        }
+    }
+    function closeProfileModal() { 
+        const modalP = getEl('modal-p');
+        if (modalP) modalP.style.display='none'; 
+    }
+
 
     // --- Привязка обработчиков событий после загрузки DOM и определения функций ---
     document.addEventListener('DOMContentLoaded', () => {
@@ -619,10 +713,27 @@
         const sendMsgBtn = getEl('send-msg-btn');
         if (sendMsgBtn) sendMsgBtn.addEventListener('click', sendMsg);
 
+        const attachFileBtn = getEl('attach-file-btn');
+        if (attachFileBtn) {
+            attachFileBtn.addEventListener('click', () => {
+                const fileInput = getEl('file-input');
+                if (fileInput) fileInput.click();
+            });
+        }
+        const fileInput = getEl('file-input');
+        if (fileInput) fileInput.addEventListener('change', () => {
+             console.log("Выбран файл:", fileInput.files[0]?.name);
+             const msgInput = getEl('msg-input');
+             if(msgInput) msgInput.focus();
+        });
+
+
         // Кнопки модального окна звонка
         const hangupBtn = getEl('hangup-btn');
         if (hangupBtn) hangupBtn.addEventListener('click', stopCallAndReset);
-        // Примечание: answer-btn привязывается внутри showIncoming, mute-toggle-btn.onclick внутри startCall и showIncoming
+        
+        const muteToggleBtn = getEl('mute-toggle-btn');
+        if (muteToggleBtn) muteToggleBtn.addEventListener('click', toggleMute);
 
         // Кнопки модального окна профиля
         const copyUidBtn = getEl('copy-uid-btn');
@@ -634,21 +745,6 @@
         const closeProfileModalBtn = getEl('close-profile-modal-btn');
         if (closeProfileModalBtn) closeProfileModalBtn.addEventListener('click', closeProfileModal);
 
-        // Новые привязки для файлов
-        const attachFileBtn = getEl('attach-file-btn');
-        if (attachFileBtn) {
-            attachFileBtn.addEventListener('click', () => {
-                const fileInput = getEl('file-input');
-                if (fileInput) fileInput.click(); // Имитируем клик по скрытому инпуту
-            });
-        }
-        // Очищаем выбранный файл после отправки
-        const fileInput = getEl('file-input');
-        if (fileInput) fileInput.addEventListener('change', () => {
-            // Можно добавить preview выбранного файла здесь, если нужно
-            console.log("Выбран файл:", fileInput.files[0]?.name);
-            getEl('msg-input').focus(); // Возвращаем фокус на текстовое поле
-        });
 
         // Автоматический вход при наличии сохраненных данных
         const saved = localStorage.getItem('cloud_v10');
@@ -667,24 +763,8 @@
             const authScreen = getEl('auth-screen');
             if (authScreen) authScreen.style.display = 'flex';
         }
-
-        // Global mute toggle listener
-        const muteToggleBtn = getEl('mute-toggle-btn');
-        if (muteToggleBtn) muteToggleBtn.addEventListener('click', toggleMute);
     });
 
-    // Global function for mute toggle
-    function toggleMute() {
-        if (localStream) {
-            isMuted = !isMuted;
-            localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
-            const muteToggleBtn = getEl('mute-toggle-btn');
-            if (muteToggleBtn) {
-                 muteToggleBtn.classList.toggle('active', isMuted);
-                 muteToggleBtn.querySelector('i').className = isMuted ? 'fa fa-microphone-slash' : 'fa fa-microphone';
-            }
-        }
-    }
 </script>
 </body>
 </html>
