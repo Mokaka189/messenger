@@ -1,0 +1,110 @@
+:root {
+    --bg: #0e1621; --side: #17212b; --blue: #0088cc;
+    --text: #ffffff; --gray: #708499; --sent: #2b5278; --danger: #e74c3c; --success: #2ecc71;
+    /* Добавляем переменные для адаптивного дизайна */
+    --sidebar-width-desktop: 320px;
+    --sidebar-width-mobile: 100%;
+}
+* { box-sizing: border-box; outline: none; }
+body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+
+/* Auth */
+#auth-screen { position: fixed; inset: 0; background: var(--bg); z-index: 10000; display: flex; align-items: center; justify-content: center; }
+.auth-card { background: var(--side); padding: 30px; border-radius: 20px; width: 320px; max-width: 90%; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+.auth-card input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #242f3d; background: #0e1621; color: white; }
+.btn { border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: 600; width: 100%; transition: 0.2s; }
+.btn-blue { background: var(--blue); color: white; }
+
+/* Sidebar */
+.sidebar {
+    width: var(--sidebar-width-desktop);
+    background: var(--side);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #0e1621;
+    flex-shrink: 0; /* Не даем сайдбару сжиматься */
+}
+.tabs { display: flex; background: #1c2733; }
+.tab { flex: 1; padding: 14px; text-align: center; cursor: pointer; color: var(--gray); font-size: 13px; }
+.tab.active { color: var(--blue); border-bottom: 2px solid var(--blue); }
+.sidebar-header { padding: 15px; border-bottom: 1px solid #0e1621; }
+.sidebar-header input { width: 100%; background: #0e1621; border: none; padding: 10px; border-radius: 10px; color: white; margin-bottom: 8px; }
+
+.rooms-list { flex: 1; overflow-y: auto; }
+.item { padding: 12px 15px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid #1c2733; transition: background 0.2s; }
+.item:hover { background: rgba(255,255,255,0.05); } /* Эффект при наведении */
+.item.active { background: var(--sent); }
+.av { width: 45px; height: 45px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0; color: white; }
+
+/* Chat */
+.chat-area { flex: 1; display: flex; flex-direction: column; background: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png') #0e1621; background-blend-mode: overlay; background-size: cover; }
+.chat-header { height: 60px; background: var(--side); display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid #0e1621; }
+.chat-header b { flex-grow: 1; } /* Заголовок чата занимает доступное пространство */
+#messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
+.msg { max-width: 70%; padding: 8px 12px; border-radius: 12px; background: #182533; box-shadow: 0 1px 2px rgba(0,0,0,0.3); word-wrap: break-word; } /* Добавлено word-wrap */
+.msg.sent { align-self: flex-end; background: var(--sent); }
+.msg b { font-size: 0.8em; color: var(--blue); margin-bottom: 4px; display: block; } /* Стиль для имени отправителя */
+
+/* Input bar */
+.input-bar { padding: 8px 15px; background: var(--side); display: flex; align-items: center; gap: 10px; border-top: 1px solid #0e1621; }
+.input-bar input { flex: 1; background: #0e1621; border: none; padding: 10px 15px; border-radius: 20px; color: white; font-size: 1em; }
+.icon-btn { background: none; border: none; color: var(--gray); font-size: 20px; cursor: pointer; transition: color 0.2s; padding: 8px; border-radius: 50%; }
+.icon-btn:hover { color: var(--blue); background: rgba(0,136,204,0.1); }
+.icon-btn.active { color: var(--blue); } /* Для кнопки микрофона */
+
+/* Modal Call */
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 11000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+.modal-box { background: var(--side); width: 300px; max-width: 90%; padding: 30px; border-radius: 25px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+.call-anim { animation: pulse 1.5s infinite; color: var(--success); }
+@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+.modal-box h3, .modal-box p { margin-bottom: 15px; }
+.modal-box .btn { margin-top: 10px; }
+
+/* Адаптивный дизайн для мобильных устройств */
+@media (max-width: 768px) {
+    body { flex-direction: row; }
+    .sidebar {
+        width: 100vw;
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease-out;
+    }
+    .sidebar.active {
+        transform: translateX(0);
+    }
+    .chat-area {
+        width: 100vw;
+        flex: 1;
+    }
+    .chat-header {
+        padding: 0 15px;
+        justify-content: flex-start;
+    }
+    .chat-header b {
+        margin-left: 10px;
+    }
+    .chat-header .icon-btn {
+        font-size: 18px;
+        padding: 6px;
+    }
+    .msg {
+        max-width: 85%;
+    }
+
+    #menu-toggle-btn { display: block !important; }
+}
+
+/* Кнопка для мобильного меню */
+#menu-toggle-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--gray);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+}
