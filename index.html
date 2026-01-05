@@ -83,14 +83,18 @@
 </div>
 
 <script type="module">
-    // Импорты Firebase остаются здесь, в модуле
+    // Импорты Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getDatabase, ref, push, onValue, set, get, update, remove } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    // Добавлен импорт для Firebase Storage
+    import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 
     // Инициализация Firebase
     const firebaseConfig = { databaseURL: "https://maxi-b3761-default-rtdb.firebaseio.com" };
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    // Инициализация Firebase Storage
+    const storage = getStorage(app);
 
     // Все ваши переменные и функции
     let user = null, activeId = null, currentTab = 'ch';
@@ -152,6 +156,12 @@
         listenForCalls();
         renderSidebar();
         getEl('auth-screen').style.display = 'none';
+
+        // Пример: Если пользователь админ, показать какую-то админскую кнопку
+        if (user.role === 'admin') {
+            console.log("Администратор вошел в систему!");
+            // getEl('admin-panel-button').style.display = 'block'; // Если есть такая кнопка
+        }
     }
 
     function setTab(t) {
@@ -224,17 +234,12 @@
         }).catch(e => console.error("Ошибка загрузки пользовательских чатов:", e));
     }
 
-    function createItem(id, name) {
-        const div = document.createElement('div');
-        div.className = `item ${activeId === id ? 'active' : ''}`;
-        div.setAttribute('data-chat-id', id);
-        div.innerHTML = `<div class="av">${name[0].toUpperCase()}</div><b>${name}</b>`;
-        div.addEventListener('click', () => selectChat(id, name));
-        getEl('rooms-list').appendChild(div);
-    }
+    function createItem(id, name) { /* ... без изменений ... */ }
 
     let unsubscribeMessages = null;
+    let currentFileUpload = null; // Для отслеживания текущей загрузки файла
 
+    // Изменена функция selectChat, чтобы убедиться, что сообщения с файлами правильно отображаются
     function selectChat(id, name) {
         if (activeId === id) return;
 
@@ -268,8 +273,29 @@
             snap.forEach(m => {
                 const d = m.val();
                 const div = document.createElement('div');
-                div.className = `msg ${d.l === user.login ? 'sent' : ''}`;
-                div.innerHTML = `<b>${d.l}: </b><span>${d.t}</span>`;
+                div.className = `msg ${d.l === user.login ? 'sent' : ''} ${d.fileUrl ? 'with-file' : ''}`;
+                
+                let contentHTML = `<b>${d.l}: </b>`;
+
+                if (d.fileUrl) {
+                    if (d.fileType && d.fileType.startsWith('image/')) {
+                        contentHTML += `<img src="${d.fileUrl}" alt="Изображение" loading="lazy">`;
+                    } else if (d.fileType && d.fileType.startsWith('audio/')) {
+                        contentHTML += `<audio controls src="${d.fileUrl}"></audio>`;
+                    } else if (d.fileType && d.fileType.startsWith('video/')) { // Опционально: добавление видео
+                        contentHTML += `<video controls src="${d.fileUrl}"></video>`;
+                    } else {
+                        contentHTML += `<a href="${d.fileUrl}" target="_blank" rel="noopener noreferrer">${d.fileName || 'Файл'} <i class="fa fa-download"></i></a>`;
+                    }
+                }
+                if (d.t) { // Если есть текстовое сообщение
+                    contentHTML += `<span>${d.t}</span>`;
+                }
+                if (d.status === 'uploading') {
+                    contentHTML += `<div class="loading-indicator">Загрузка...</div>`;
+                }
+
+                div.innerHTML = contentHTML;
                 mBox.appendChild(div);
             });
             mBox.scrollTop = mBox.scrollHeight;
@@ -280,14 +306,116 @@
         }
     }
 
-    function sendMsg() {
+    // Новая функция для сжатия изображения
+    function compressImage(file, maxWidth, maxHeight, quality) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width *= maxHeight / height;
+                            height = maxHeight;
+                        }
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        resolve(blob);
+                    }, file.type, quality);
+                };
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Изменена функция sendMsg для отправки файлов
+    async function sendMsg() {
         const msgInput = getEl('msg-input');
-        const t = msgInput.value.trim();
-        if(!t || !activeId) return;
+        const fileInput = getEl('file-input');
+        const text = msgInput.value.trim();
+        const file = fileInput?.files[0];
+
+        if ((!text && !file) || !activeId) return;
+
+        msgInput.value = ''; // Очищаем текстовое поле сразу
         
         const chatPath = activeId.includes('___') ? `dms/${activeId}` : `messages/${activeId}`;
-        push(ref(db, chatPath), { l: user.login, t: t });
-        msgInput.value = '';
+        let fileUrl = null;
+        let fileName = null;
+        let fileType = null;
+
+        if (file) {
+            fileName = file.name;
+            fileType = file.type;
+            
+            // Если это изображение, пытаемся сжать
+            let fileToUpload = file;
+            if (fileType.startsWith('image/')) {
+                // Сжимаем до 800px по широкой стороне с качеством 0.8
+                fileToUpload = await compressImage(file, 800, 800, 0.8);
+            }
+
+            const uniqueFileName = `${user.login}_${Date.now()}_${fileName}`;
+            const fileStorageRef = storageRef(storage, `chat_files/${activeId}/${uniqueFileName}`);
+            
+            // Создаем сообщение-заглушку в БД со статусом "загрузка"
+            const tempMessageRef = push(ref(db, chatPath));
+            await set(tempMessageRef, {
+                l: user.login,
+                t: text || '',
+                fileName: fileName,
+                fileType: fileType,
+                status: 'uploading', // Статус загрузки
+                timestamp: Date.now()
+            });
+
+            const uploadTask = uploadBytesResumable(fileStorageRef, fileToUpload);
+            
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    // Можно показывать прогресс загрузки в UI, если нужно
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    console.log('Upload is ' + progress + '% done');
+                },
+                (error) => {
+                    console.error("Ошибка загрузки файла:", error);
+                    // Удалить или изменить статус сообщения-заглушки при ошибке
+                    update(tempMessageRef, { status: 'failed', errorMessage: error.message });
+                    alert("Ошибка при загрузке файла.");
+                },
+                () => { // Успешная загрузка
+                    getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+                        fileUrl = downloadURL;
+                        // Обновляем сообщение в БД с реальной ссылкой и статусом "отправлено"
+                        await update(tempMessageRef, {
+                            fileUrl: fileUrl,
+                            status: 'sent',
+                            timestamp: Date.now() // Обновим timestamp, чтобы сообщение было актуальным
+                        });
+                        fileInput.value = ''; // Сбрасываем выбранный файл
+                    });
+                }
+            );
+        } else {
+            // Если файла нет, отправляем только текстовое сообщение
+            push(ref(db, chatPath), { l: user.login, t: text, timestamp: Date.now() });
+        }
     }
 
     function toggleSidebar() {
@@ -352,14 +480,7 @@
             stopCallAndReset();
         }
 
-        muteToggleBtn.onclick = () => {
-            if (localStream) {
-                isMuted = !isMuted;
-                localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
-                muteToggleBtn.classList.toggle('active', isMuted);
-                muteToggleBtn.querySelector('i').className = isMuted ? 'fa fa-microphone-alt-slash' : 'fa fa-microphone';
-            }
-        };
+        // Mute toggle handled globally
     }
 
     function listenForCalls() {
@@ -396,7 +517,7 @@
 
         activeId = id;
 
-        ansBtn.addEventListener('click', async function ansClickHandler() { // Именованная функция для возможности удаления обработчика
+        ansBtn.addEventListener('click', async function ansClickHandler() {
             try {
                 pc = new RTCPeerConnection(rtcConfig);
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -410,12 +531,12 @@
                 await pc.setLocalDescription(ans);
                 await set(ref(db, `calls/${id}/answer`), { sdp: ans.sdp, type: ans.type });
                 
-                onValue(ref(db, `calls/${id}/candi`), s => s.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c.val())).catch(e => console.warn("Error adding ICE candidate:", e))));
+                onValueref(db, `calls/${id}/candi`), s => s.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c.val())).catch(e => console.warn("Error adding ICE candidate:", e)));
                 
                 ansBtn.style.display = 'none';
                 callTitle.innerText = "Разговор...";
 
-                ansBtn.removeEventListener('click', ansClickHandler); // Удаляем обработчик после использования
+                ansBtn.removeEventListener('click', ansClickHandler);
 
                 onValue(ref(db, `calls/${id}`), (snapshot) => {
                     if (!snapshot.exists()) {
@@ -431,14 +552,7 @@
             }
         });
 
-        muteToggleBtn.onclick = () => {
-            if (localStream) {
-                isMuted = !isMuted;
-                localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
-                muteToggleBtn.classList.toggle('active', isMuted);
-                muteToggleBtn.querySelector('i').className = isMuted ? 'fa fa-microphone-alt-slash' : 'fa fa-microphone';
-            }
-        };
+        // Mute toggle handled globally
     }
 
     function stopCallAndReset() {
@@ -458,7 +572,7 @@
         }
 
         if(activeId && getEl('call-modal').style.display === 'flex') {
-            remove(ref(db, `calls/${activeId}`)).catch(e => console.error("Ошибка удаления данных звонка:", e));
+            removeref(db, `calls/${activeId}`).catch(e => console.error("Ошибка удаления данных звонка:", e));
         }
 
         getEl('call-modal').style.display = 'none';
@@ -472,7 +586,6 @@
     }
     function copyUID() { navigator.clipboard.writeText(user.uid); alert("ID Скопирован"); }
     function closeProfileModal() { getEl('modal-p').style.display='none'; }
-
 
     // --- Привязка обработчиков событий после загрузки DOM и определения функций ---
     document.addEventListener('DOMContentLoaded', () => {
@@ -521,6 +634,21 @@
         const closeProfileModalBtn = getEl('close-profile-modal-btn');
         if (closeProfileModalBtn) closeProfileModalBtn.addEventListener('click', closeProfileModal);
 
+        // Новые привязки для файлов
+        const attachFileBtn = getEl('attach-file-btn');
+        if (attachFileBtn) {
+            attachFileBtn.addEventListener('click', () => {
+                const fileInput = getEl('file-input');
+                if (fileInput) fileInput.click(); // Имитируем клик по скрытому инпуту
+            });
+        }
+        // Очищаем выбранный файл после отправки
+        const fileInput = getEl('file-input');
+        if (fileInput) fileInput.addEventListener('change', () => {
+            // Можно добавить preview выбранного файла здесь, если нужно
+            console.log("Выбран файл:", fileInput.files[0]?.name);
+            getEl('msg-input').focus(); // Возвращаем фокус на текстовое поле
+        });
 
         // Автоматический вход при наличии сохраненных данных
         const saved = localStorage.getItem('cloud_v10');
@@ -539,8 +667,24 @@
             const authScreen = getEl('auth-screen');
             if (authScreen) authScreen.style.display = 'flex';
         }
+
+        // Global mute toggle listener
+        const muteToggleBtn = getEl('mute-toggle-btn');
+        if (muteToggleBtn) muteToggleBtn.addEventListener('click', toggleMute);
     });
 
+    // Global function for mute toggle
+    function toggleMute() {
+        if (localStream) {
+            isMuted = !isMuted;
+            localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+            const muteToggleBtn = getEl('mute-toggle-btn');
+            if (muteToggleBtn) {
+                 muteToggleBtn.classList.toggle('active', isMuted);
+                 muteToggleBtn.querySelector('i').className = isMuted ? 'fa fa-microphone-slash' : 'fa fa-microphone';
+            }
+        }
+    }
 </script>
 </body>
 </html>
