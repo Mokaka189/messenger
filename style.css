@@ -108,3 +108,37 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
     cursor: pointer;
     padding: 0;
 }
+
+/* ... остальной CSS ... */
+
+#messages img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin-top: 5px; /* Отступ от текста сообщения */
+    display: block; /* Убеждаемся, что изображение ведет себя как блок */
+}
+#messages audio, #messages video {
+    max-width: 100%;
+    margin-top: 5px;
+    display: block;
+    border-radius: 8px;
+}
+.msg.with-file {
+    padding-bottom: 5px; /* Немного уменьшить нижний отступ, если есть файл */
+}
+.file-preview {
+    max-width: 100px; /* Размер превью */
+    height: auto;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    display: block;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Добавьте это, если хотите показать индикатор загрузки */
+.loading-indicator {
+    color: var(--gray);
+    font-size: 0.8em;
+    margin-top: 5px;
+}
