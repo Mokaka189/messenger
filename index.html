@@ -469,8 +469,6 @@
         const answerBtn = getEl('answer-btn');
         // muteToggleBtn привязан глобально
         const remoteAudio = getEl('remote-audio');
-
-
         if (callModal) callModal.style.display = 'flex';
         if (callTitle) callTitle.innerText = "Вызов...";
         if (callUser) callUser.innerText = activeId.replace(user.login,'').replace('___','');
@@ -624,15 +622,29 @@
         }
     }
 
+    // Исправленная и дополненная функция stopCallAndReset
     function stopCallAndReset() {
+        console.log("stopCallAndReset: Начинаем сброс звонка.");
+
+        // Закрываем PeerConnection
         if(pc) {
+            console.log("stopCallAndReset: Закрываем RTCPeerConnection.");
             pc.close();
             pc = null;
+        } else {
+            console.log("stopCallAndReset: RTCPeerConnection не активен.");
         }
+
+        // Останавливаем локальный медиа-поток
         if(localStream) {
+            console.log("stopCallAndReset: Останавливаем локальный медиа-поток.");
             localStream.getTracks().forEach(t => t.stop());
             localStream = null;
+        } else {
+            console.log("stopCallAndReset: Локальный медиа-поток не активен.");
         }
+
+        // Сбрасываем состояние mute
         isMuted = false;
         const muteToggleBtn = getEl('mute-toggle-btn');
         if (muteToggleBtn) {
@@ -641,45 +653,37 @@
             if (icon) icon.className = 'fa fa-microphone';
         }
 
+        // Удаляем данные о звонке из Firebase
         if (activeId) {
-            // Исправлено: .catch() вызывается на результате remove(), который возвращает Promise
+            console.log(`stopCallAndReset: Удаляем данные о звонке ${activeId} из Firebase.`);
             remove(ref(db, `calls/${activeId}`))
-                .catch(e => console.error("Ошибка удаления данных звонка:", e));
+                .then(() => console.log(`stopCallAndReset: Данные о звонке ${activeId} успешно удалены.`))
+                .catch(e => console.error("Ошибка удаления данных звонка из Firebase:", e));
+        } else {
+            console.log("stopCallAndReset: activeId не установлен, данные о звонке не удаляются из Firebase.");
         }
 
+        // Скрываем модальное окно звонка
         const callModal = getEl('call-modal');
         if (callModal) callModal.style.display = 'none';
         
+        // Очищаем источник удаленного аудио
         const remoteAudio = getEl('remote-audio');
         if (remoteAudio) remoteAudio.srcObject = null;
         
+        // Сбрасываем активный ID звонка
         activeId = null; 
+        console.log("stopCallAndReset: activeId сброшен.");
 
+        // Отписываемся от слушателя входящих звонков, если он был активен
         if (currentIncomingCallListenerFn) {
+            console.log("stopCallAndReset: Отписываемся от слушателя входящих звонков.");
             currentIncomingCallListenerFn();
             currentIncomingCallListenerFn = null;
         }
-    }
 
-    function openProfile() {
-        const modalP = getEl('modal-p');
-        if (modalP) modalP.style.display='flex';
-        const pUid = getEl('p-uid');
-        if (pUid && user) pUid.innerText = user.uid;
+        console.log("stopCallAndReset: Сброс звонка завершен.");
     }
-    function copyUID() { 
-        if (user && user.uid) {
-            navigator.clipboard.writeText(user.uid); 
-            alert("ID Скопирован"); 
-        } else {
-            alert("Нет доступного ID для копирования.");
-        }
-    }
-    function closeProfileModal() { 
-        const modalP = getEl('modal-p');
-        if (modalP) modalP.style.display='none'; 
-    }
-
 
     // --- Привязка обработчиков событий после загрузки DOM и определения функций ---
     document.addEventListener('DOMContentLoaded', () => {
@@ -727,11 +731,22 @@
              if(msgInput) msgInput.focus();
         });
 
-
         // Кнопки модального окна звонка
         const hangupBtn = getEl('hangup-btn');
-        if (hangupBtn) hangupBtn.addEventListener('click', stopCallAndReset);
-        
+        if (hangupBtn) {
+            // Убедимся, что мы привязываем обработчик только один раз
+            // Удалим любой существующий обработчик, прежде чем добавлять новый,
+            // чтобы избежать дублирования, если DOMContentLoaded вызывается повторно (маловероятно, но безопасно)
+            const oldHangupHandler = hangupBtn._hangupClickHandler;
+            if (oldHangupHandler) {
+                hangupBtn.removeEventListener('click', oldHangupHandler);
+            }
+
+            const newHangupHandler = stopCallAndReset; // Прямая ссылка на функцию
+            hangupBtn.addEventListener('click', newHangupHandler);
+            hangupBtn._hangupClickHandler = newHangupHandler; // Сохраняем ссылку для возможного удаления
+        }
+
         const muteToggleBtn = getEl('mute-toggle-btn');
         if (muteToggleBtn) muteToggleBtn.addEventListener('click', toggleMute);
 
@@ -744,7 +759,6 @@
 
         const closeProfileModalBtn = getEl('close-profile-modal-btn');
         if (closeProfileModalBtn) closeProfileModalBtn.addEventListener('click', closeProfileModal);
-
 
         // Автоматический вход при наличии сохраненных данных
         const saved = localStorage.getItem('cloud_v10');
