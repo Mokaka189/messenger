@@ -2,306 +2,545 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cloud Ultra FIX</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Audio Messenger</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root { --bg: #0e1621; --side: #17212b; --blue: #0088cc; --text: #fff; --gray: #708499; --sent: #2b5278; --danger: #e74c3c; --success: #2ecc71; }
-        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
-        body { font-family: sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
-        
-        .app-container { display: flex; width: 200vw; height: 100vh; transition: 0.3s; }
-        .app-container.chat-open { transform: translateX(-100vw); }
-        .sidebar, .chat-area { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
-
-        /* Auth */
-        #auth-screen { position: fixed; inset: 0; background: var(--bg); z-index: 10000; display: flex; align-items: center; justify-content: center; }
-        .auth-card { background: var(--side); padding: 30px; border-radius: 20px; width: 90%; max-width: 320px; text-align: center; }
-        .auth-card input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #242f3d; background: #0e1621; color: white; }
-
-        /* Sidebar */
-        .sidebar { background: var(--side); border-right: 1px solid #000; }
-        .tabs { display: flex; background: #1c2733; }
-        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; color: var(--gray); font-weight: bold; }
-        .tab.active { color: var(--blue); border-bottom: 2px solid var(--blue); }
-        .list { flex: 1; overflow-y: auto; }
-        .item { padding: 15px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #1c2733; cursor: pointer; }
-        .av { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; flex-shrink: 0; }
-
-        /* Chat */
-        .chat-header { height: 60px; padding: 0 15px; background: var(--side); display: flex; align-items: center; border-bottom: 1px solid #000; }
-        #messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .msg { max-width: 80%; padding: 10px; border-radius: 12px; background: #182533; position: relative; }
-        .msg.sent { align-self: flex-end; background: var(--sent); }
-        .status { font-size: 10px; margin-left: 5px; color: var(--gray); }
-        .status.read { color: var(--success); }
-
-        .input-bar { padding: 10px; background: var(--side); display: flex; align-items: center; gap: 8px; }
-        .input-bar input { flex: 1; background: #0e1621; border: none; padding: 10px 15px; border-radius: 20px; color: white; }
-        .btn-icon { background: none; border: none; color: var(--gray); font-size: 20px; cursor: pointer; }
-
-        /* Modals */
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 20000; align-items: center; justify-content: center; }
-        .m-box { background: var(--side); width: 85%; max-width: 300px; padding: 25px; border-radius: 20px; text-align: center; }
-        .btn { border: none; padding: 12px; border-radius: 10px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- Подключаем внешний CSS файл -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<audio id="snd-msg" src="https://raw.githubusercontent.com/fshost/tg-sounds/master/sent.mp3"></audio>
-<audio id="snd-ring" src="https://raw.githubusercontent.com/fshost/tg-sounds/master/incoming.mp3" loop></audio>
-<audio id="snd-out" src="https://raw.githubusercontent.com/fshost/tg-sounds/master/outgoing.mp3" loop></audio>
-
 <div id="auth-screen">
     <div class="auth-card">
-        <h2>Cloud Ultra</h2>
-        <input type="text" id="a-l" placeholder="Логин">
-        <input type="password" id="a-p" placeholder="Пароль">
-        <button class="btn" style="background:var(--blue); color:white" onclick="auth('login')">ВОЙТИ</button>
-        <button class="btn" style="background:none; color:var(--gray)" onclick="auth('reg')">Регистрация</button>
+        <i class="fa-brands fa-telegram fa-4x" style="color:var(--blue); margin-bottom:15px;"></i>
+        <h2>Cloud Audio</h2>
+        <input type="text" id="a-login" placeholder="Логин">
+        <input type="password" id="a-pass" placeholder="Пароль">
+        <button class="btn btn-blue" id="auth-login-btn">ВОЙТИ</button>
+        <button class="btn" style="background:none; color:var(--gray)" id="auth-reg-btn">Регистрация</button>
     </div>
 </div>
 
-<div class="app-container" id="app">
-    <div class="sidebar">
-        <div class="tabs">
-            <div class="tab active" onclick="setTab('ch', this)">КАНАЛЫ</div>
-            <div class="tab" onclick="setTab('dm', this)">ЛИЧНЫЕ</div>
-        </div>
-        <div style="padding:10px">
-            <input type="text" id="srch" placeholder="ID друга или Имя..." style="width:100%; padding:10px; background:#0e1621; border:none; border-radius:10px; color:white">
-            <button class="btn" style="background:var(--blue); color:white" onclick="action()" id="act-btn">Создать канал</button>
-        </div>
-        <div class="list" id="r-list"></div>
-        <div style="padding:15px; background:#1c2733; display:flex; align-items:center; gap:10px" onclick="showProf()">
-            <div class="av" id="m-av" style="background:var(--blue)">?</div>
-            <div style="flex:1"><b id="m-n">...</b><div style="font-size:10px" id="m-id">ID...</div></div>
-        </div>
+<div class="sidebar" id="sidebar">
+    <div class="tabs">
+        <div class="tab active" id="tab-ch">КАНАЛЫ</div>
+        <div class="tab" id="tab-dm">ЛИЧНЫЕ</div>
     </div>
-
-    <div class="chat-area">
-        <div class="chat-header">
-            <i class="fa fa-arrow-left" style="margin-right:15px" onclick="document.getElementById('app').classList.remove('chat-open')"></i>
-            <b id="h-n">Чат</b>
-            <button class="btn-icon" id="call-btn" style="margin-left:auto; color:var(--success); display:none" onclick="call()"><i class="fa fa-phone"></i></button>
-        </div>
-        <div id="messages"></div>
-        <div class="input-bar">
-            <input type="file" id="f-in" style="display:none" onchange="upFile()">
-            <button class="btn-icon" onclick="document.getElementById('f-in').click()"><i class="fa fa-paperclip"></i></button>
-            <input type="text" id="m-in" placeholder="Сообщение..." disabled>
-            <button class="btn-icon" id="v-btn" onmousedown="startV()" onmouseup="stopV()" ontouchstart="startV()" ontouchend="stopV()"><i class="fa fa-microphone"></i></button>
-            <button class="btn-icon" style="color:var(--blue)" onclick="send()"><i class="fa fa-paper-plane"></i></button>
-        </div>
+    <div class="sidebar-header">
+        <input type="text" id="search-input" placeholder="Введите ID...">
+        <button class="btn btn-blue" id="action-btn">Создать канал</button>
+    </div>
+    <div class="rooms-list" id="rooms-list"></div>
+    <div style="padding:15px; border-top:1px solid #0e1621; display:flex; align-items:center; gap:10px; cursor:pointer;" id="open-profile-btn">
+        <div class="av" id="my-av">?</div>
+        <div style="flex:1"><b id="my-name">...</b><div style="font-size:10px; color:var(--gray)">Настройки</div></div>
     </div>
 </div>
 
-<div class="modal" id="call-m">
-    <div class="m-box">
-        <h2 id="c-st">Звонок...</h2>
-        <div class="av" style="margin:20px auto; width:70px; height:70px; background:var(--blue); font-size:25px">📞</div>
+<div class="chat-area">
+    <div class="chat-header">
+        <button class="icon-btn" id="menu-toggle-btn">
+            <i class="fa fa-bars"></i>
+        </button>
+        <b id="h-name">Выберите чат</b>
+        <button class="icon-btn" id="call-init-btn" style="margin-left:auto; display:none; color:var(--success)">
+            <i class="fa fa-phone"></i>
+        </button>
+    </div>
+    <div id="messages"></div>
+    <div class="input-bar">
+        <button class="icon-btn" id="voice-record-btn"><i class="fa fa-microphone"></i></button>
+        <input type="text" id="msg-input" placeholder="Сообщение..." disabled>
+        <button class="icon-btn" style="color:var(--blue)" id="send-msg-btn"><i class="fa fa-paper-plane"></i></button>
+    </div>
+</div>
+
+<div class="modal" id="call-modal">
+    <div class="modal-box">
+        <i class="fa fa-phone-volume fa-3x call-anim"></i>
+        <h3 id="call-title">Звонок...</h3>
+        <p id="call-user">Имя</p>
+        <div style="display:flex; gap:10px; margin-top:20px; justify-content: center;">
+            <button class="btn" id="answer-btn" style="background:var(--success); color:white; display:none;">Принять</button>
+            <button class="btn" id="hangup-btn" style="background:var(--danger); color:white;">Сброс</button>
+        </div>
         <audio id="remote-audio" autoplay></audio>
-        <button class="btn" id="ans-b" style="background:var(--success); color:white; display:none">ПРИНЯТЬ</button>
-        <button class="btn" style="background:var(--danger); color:white" onclick="location.reload()">СБРОС</button>
+        <button class="icon-btn" id="mute-toggle-btn" style="color: white; margin-top: 20px;">
+            <i class="fa fa-microphone-slash"></i>
+        </button>
     </div>
 </div>
 
-<div class="modal" id="prof-m">
-    <div class="m-box">
-        <h3>Профиль</h3>
-        <input type="text" id="ed-n" placeholder="Имя" style="width:100%; padding:10px; margin-bottom:10px; background:#0e1621; border:none; color:white; border-radius:10px">
-        <input type="text" id="ed-c" placeholder="Цвет (hex)" style="width:100%; padding:10px; margin-bottom:10px; background:#0e1621; border:none; color:white; border-radius:10px">
-        <button class="btn" style="background:var(--blue); color:white" onclick="saveProf()">Сохранить</button>
-        <button class="btn" style="background:var(--danger); color:white" onclick="localStorage.clear(); location.reload()">Выйти</button>
-        <button class="btn" style="background:none; color:white" onclick="this.parentElement.parentElement.style.display='none'">Назад</button>
+<div class="modal" id="modal-p">
+    <div class="modal-box">
+        <h3>Ваш ID</h3>
+        <p id="p-uid" style="background:#0e1621; padding:10px; border-radius:10px; font-family:monospace; word-break: break-all;"></p>
+        <button class="btn btn-blue" id="copy-uid-btn">Копировать ID</button>
+        <button class="btn" style="background:var(--danger); color:white; margin-top:10px;" id="logout-btn">ВЫЙТИ</button>
+        <button class="btn" style="background:none; color:white; margin-top:5px" id="close-profile-modal-btn">Назад</button>
     </div>
 </div>
 
 <script type="module">
+    // Импорты Firebase остаются здесь, в модуле
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getDatabase, ref, push, onValue, set, get, update, remove } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
-    const fb = { databaseURL: "https://maxi-b3761-default-rtdb.firebaseio.com" };
-    const app = initializeApp(fb);
+    // Инициализация Firebase
+    const firebaseConfig = { databaseURL: "https://maxi-b3761-default-rtdb.firebaseio.com" };
+    const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    let user = null, activeId = null, tab = 'ch', pc, stream, vRec, vChunks = [];
+    // Все ваши переменные и функции
+    let user = null, activeId = null, currentTab = 'ch';
+    let pc, localStream;
+    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    let isMuted = false;
 
-    const play = (id) => document.getElementById(id).play().catch(()=>{});
-    const stop = (id) => { const a=document.getElementById(id); a.pause(); a.currentTime=0; };
+    const genID = (pre) => pre + '_' + Math.random().toString(36).substr(2, 9);
+    const getEl = (id) => document.getElementById(id);
 
-    window.auth = async (m) => {
-        const l = document.getElementById('a-l').value.trim(), p = document.getElementById('a-p').value.trim();
-        if(!l || !p) return;
-        if(m === 'reg') {
-            const uid = 'u_'+Math.random().toString(36).substr(2,5);
-            await set(ref(db, 'users/'+l), {p, uid, n:l, c:'#0088cc'});
-            alert("Ок! Входи.");
-        } else {
-            const s = await get(ref(db, 'users/'+l));
-            if(s.exists() && s.val().p === p) {
-                user = {l, ...s.val()};
-                localStorage.setItem('cl_s', JSON.stringify({l,p}));
-                document.getElementById('auth-screen').style.display='none';
-                start();
-            } else alert("Ошибка!");
+    // --- Функции (Auth, Sidebar, Call, etc.) ---
+    async function auth(type) {
+        const l = getEl('a-login').value.trim();
+        const p = getEl('a-pass').value.trim();
+        if(!l || !p) {
+            alert("Пожалуйста, введите логин и пароль.");
+            return;
         }
-    };
 
-    const s_c = localStorage.getItem('cl_s');
-    if(s_c) { const d=JSON.parse(s_c); document.getElementById('a-l').value=d.l; document.getElementById('a-p').value=d.p; auth('login'); }
-
-    function start() {
-        document.getElementById('m-n').innerText = user.n;
-        document.getElementById('m-av').innerText = user.n[0];
-        document.getElementById('m-av').style.background = user.c;
-        document.getElementById('m-id').innerText = "ID: "+user.uid;
-        onValue(ref(db, `user_chats/${user.l}`), render);
-        listen();
-    }
-
-    window.setTab = (t, el) => {
-        tab = t;
-        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-        el.classList.add('active');
-        document.getElementById('act-btn').innerText = t==='ch'?'Создать канал':'Добавить по ID';
-        render();
-    };
-
-    window.action = async () => {
-        const v = document.getElementById('srch').value.trim();
-        if(!v) return;
-        if(tab === 'ch') {
-            const id = 'ch_'+Math.random().toString(36).substr(2,5);
-            await set(ref(db, 'rooms/'+id), {n: v, o: user.l});
-            await update(ref(db, `user_chats/${user.l}`), {[id]:true});
-        } else {
-            const s = await get(ref(db, 'users'));
-            let f = ''; s.forEach(u => {if(u.val().uid===v) f=u.key;});
-            if(f && f!==user.l) {
-                const id = [user.l, f].sort().join('___');
-                await update(ref(db, `user_chats/${user.l}`), {[id]:true});
-                await update(ref(db, `user_chats/${f}`), {[id]:true});
+        try {
+            if(type === 'reg') {
+                const existingUser = await get(ref(db, 'users/' + l));
+                if (existingUser.exists()) {
+                    alert("Пользователь с таким логином уже существует.");
+                    return;
+                }
+                const uid = genID('u');
+                await set(ref(db, 'users/' + l), { pass: p, uid: uid });
+                alert("Регистрация успешна! Теперь вы можете войти.");
+                getEl('a-pass').value = '';
+            } else {
+                const snapshot = await get(ref(db, 'users/' + l));
+                if(snapshot.exists() && snapshot.val().pass === p) {
+                    user = { login: l, ...snapshot.val() };
+                    if(!user.uid) {
+                        user.uid = genID('u');
+                        await update(ref(db, 'users/'+l), {uid: user.uid});
+                    }
+                    localStorage.setItem('cloud_v10', JSON.stringify({l, p}));
+                    getEl('auth-screen').style.display = 'none';
+                    startApp();
+                } else {
+                    alert("Неверный логин или пароль.");
+                    getEl('a-pass').value = '';
+                }
             }
+        } catch (error) {
+            console.error("Ошибка аутентификации:", error);
+            alert("Произошла ошибка при попытке " + (type === 'reg' ? "регистрации" : "входа") + ". Проверьте консоль для деталей.");
         }
-        document.getElementById('srch').value='';
-    };
+    }
 
-    function render() {
-        const b = document.getElementById('r-list'); b.innerHTML = '';
-        get(ref(db, `user_chats/${user.l}`)).then(s => {
-            Object.keys(s.val()||{}).forEach(id => {
-                if(tab==='ch' && id.startsWith('ch_')) {
-                    get(ref(db, 'rooms/'+id)).then(r => r.exists() && item(id, r.val().n, '#0088cc'));
+    function logout() { localStorage.clear(); location.reload(); }
+
+    function startApp() {
+        getEl('my-name').innerText = user.login;
+        getEl('my-av').innerText = user.login[0].toUpperCase();
+        onValue(ref(db, `user_chats/${user.login}`), () => renderSidebar());
+        listenForCalls();
+        renderSidebar();
+        getEl('auth-screen').style.display = 'none';
+    }
+
+    function setTab(t) {
+        currentTab = t;
+        getEl('tab-ch').classList.toggle('active', t === 'ch');
+        getEl('tab-dm').classList.toggle('active', t === 'dm');
+        getEl('action-btn').innerText = t === 'ch' ? 'Создать канал' : 'Найти по ID';
+        renderSidebar();
+    }
+
+    async function handleAction() {
+        const val = getEl('search-input').value.trim();
+        if(currentTab === 'ch') {
+            const name = val || prompt("Введите название канала:");
+            if(!name) return;
+            const cid = genID('ch');
+            await set(ref(db, 'rooms/' + cid), { name, owner: user.login });
+            await update(ref(db, `user_chats/${user.login}`), { [cid]: true });
+            alert(`Канал "${name}" создан! ID: ${cid}`);
+        } else { // DM
+            if (!val) {
+                alert("Пожалуйста, введите ID пользователя.");
+                return;
+            }
+            const usersRef = await get(ref(db, 'users'));
+            let friendLogin = null;
+            usersRef.forEach(u => {
+                if(u.val().uid === val && u.key !== user.login) {
+                    friendLogin = u.key;
+                }
+            });
+
+            if(!friendLogin) {
+                alert("Пользователь с таким ID не найден или это ваш ID.");
+                return;
+            }
+            if (friendLogin === user.login) {
+                 alert("Вы не можете добавить самого себя.");
+                 return;
+            }
+
+            const dmid = [user.login, friendLogin].sort().join("___");
+            await update(ref(db, `user_chats/${user.login}`), { [dmid]: true });
+            await update(ref(db, `user_chats/${friendLogin}`), { [dmid]: true });
+            alert(`Чат с пользователем ${friendLogin} добавлен.`);
+        }
+        getEl('search-input').value = '';
+        renderSidebar();
+    }
+
+    function renderSidebar() {
+        const box = getEl('rooms-list');
+        box.innerHTML = '';
+        get(ref(db, `user_chats/${user.login}`)).then(snap => {
+            const data = snap.val() || {};
+            const chatIds = Object.keys(data).filter(id => {
+                return (currentTab === 'ch' && id.startsWith('ch_')) || (currentTab === 'dm' && id.includes('___'));
+            });
+
+            chatIds.forEach(id => {
+                if(id.startsWith('ch_')) {
+                    getref(db, 'rooms/' + id).then(s => {
+                        if(s.exists()) createItem(id, s.val().name);
+                    }).catch(e => console.error("Ошибка загрузки канала:", e));
                 } else if(id.includes('___')) {
-                    const f = id.replace(user.l,'').replace('___','');
-                    get(ref(db, 'users/'+f)).then(u => item(id, u.val().n, u.val().c));
+                    const otherUserLogin = id.replace(user.login, '').replace('___', '');
+                    createItem(id, otherUserLogin);
                 }
             });
+        }).catch(e => console.error("Ошибка загрузки пользовательских чатов:", e));
+    }
+
+    function createItem(id, name) {
+        const div = document.createElement('div');
+        div.className = `item ${activeId === id ? 'active' : ''}`;
+        div.setAttribute('data-chat-id', id);
+        div.innerHTML = `<div class="av">${name[0].toUpperCase()}</div><b>${name}</b>`;
+        div.addEventListener('click', () => selectChat(id, name));
+        getEl('rooms-list').appendChild(div);
+    }
+
+    let unsubscribeMessages = null;
+
+    function selectChat(id, name) {
+        if (activeId === id) return;
+
+        if (unsubscribeMessages) {
+            unsubscribeMessages();
+        }
+
+        document.querySelectorAll('.rooms-list .item').forEach(item => {
+            item.classList.remove('active');
         });
-    }
+        const selectedItem = document.querySelector(`.rooms-list .item[data-chat-id="${id}"]`);
+        if (selectedItem) {
+            selectedItem.classList.add('active');
+        }
 
-    function item(id, n, c) {
-        const d = document.createElement('div'); d.className = 'item';
-        d.innerHTML = `<div class="av" style="background:${c}">${n[0]}</div><b>${n}</b>`;
-        d.onclick = () => {
-            activeId = id; document.getElementById('h-n').innerText = n;
-            document.getElementById('m-in').disabled = false;
-            document.getElementById('call-btn').style.display = id.includes('___')?'block':'none';
-            document.getElementById('app').classList.add('chat-open');
-            loadMsgs();
-        };
-        document.getElementById('r-list').appendChild(d);
-    }
+        activeId = id;
+        getEl('h-name').innerText = name;
+        getEl('msg-input').disabled = false;
+        
+        const callInitBtn = getEl('call-init-btn');
+        if (callInitBtn) {
+            callInitBtn.style.display = id.includes('___') ? 'block' : 'none';
+        }
 
-    function loadMsgs() {
-        const p = activeId.includes('___') ? `dms/${activeId}` : `msgs/${activeId}`;
-        onValue(ref(db, p), s => {
-            const b = document.getElementById('messages'); b.innerHTML = '';
-            s.forEach(m => {
+        const chatPath = id.includes('___') ? `dms/${id}` : `messages/${id}`;
+        const mBox = getEl('messages');
+        mBox.innerHTML = '';
+
+        unsubscribeMessages = onValue(ref(db, chatPath), snap => {
+            mBox.innerHTML = '';
+            snap.forEach(m => {
                 const d = m.val();
-                if(d.l!==user.l && !d.r) update(ref(db, p+'/'+m.key), {r:true});
-                const dv = document.createElement('div'); dv.className = `msg ${d.l===user.l?'sent':''}`;
-                let c = d.t;
-                if(d.type==='f') c=`<a href="${d.t}" download="${d.name}" style="color:cyan">📁 ${d.name}</a>`;
-                if(d.type==='v') c=`<audio src="${d.t}" controls style="width:180px"></audio>`;
-                dv.innerHTML = `<b>${d.l}</b>${c}<span class="status ${d.r?'read':''}">${d.l===user.l?(d.r?'✓✓':'✓'):''}</span>`;
-                b.appendChild(dv);
+                const div = document.createElement('div');
+                div.className = `msg ${d.l === user.login ? 'sent' : ''}`;
+                div.innerHTML = `<b>${d.l}: </b><span>${d.t}</span>`;
+                mBox.appendChild(div);
             });
-            b.scrollTop = b.scrollHeight;
+            mBox.scrollTop = mBox.scrollHeight;
         });
+
+        if (window.innerWidth <= 768) {
+            toggleSidebar();
+        }
     }
 
-    window.send = (ex={}) => {
-        const t = document.getElementById('m-in').value.trim();
-        if(!t && !ex.t) return;
-        const p = activeId.includes('___') ? `dms/${activeId}` : `msgs/${activeId}`;
-        push(ref(db, p), {l: user.l, t: t||ex.t, r:false, ...ex});
-        document.getElementById('m-in').value=''; play('snd-msg');
-    };
+    function sendMsg() {
+        const msgInput = getEl('msg-input');
+        const t = msgInput.value.trim();
+        if(!t || !activeId) return;
+        
+        const chatPath = activeId.includes('___') ? `dms/${activeId}` : `messages/${activeId}`;
+        push(ref(db, chatPath), { l: user.login, t: t });
+        msgInput.value = '';
+    }
 
-    window.upFile = () => {
-        const f = document.getElementById('f-in').files[0];
-        const r = new FileReader(); r.onload=()=>send({type:'f', name:f.name, t:r.result});
-        r.readAsDataURL(f);
-    };
+    function toggleSidebar() {
+        const sidebar = getEl('sidebar');
+        sidebar.classList.toggle('active');
+    }
 
-    window.startV = async () => {
-        stream = await navigator.mediaDevices.getUserMedia({audio:true});
-        vRec = new MediaRecorder(stream); vRec.ondataavailable = e => vChunks.push(e.data);
-        vRec.onstop = () => {
-            const r = new FileReader(); r.onload=()=>send({type:'v', t:r.result});
-            r.readAsDataURL(new Blob(vChunks, {type:'audio/webm'})); vChunks=[];
-        };
-        vRec.start(); document.getElementById('v-btn').style.color='red';
-    };
-    window.stopV = () => { if(vRec) vRec.stop(); document.getElementById('v-btn').style.color='var(--gray)'; };
+    async function startCall() {
+        if (!activeId || !activeId.includes('___')) {
+            alert("Вы можете звонить только в личных чатах.");
+            return;
+        }
 
-    // --- CALLS ---
-    window.call = async () => {
-        document.getElementById('call-m').style.display='flex'; play('snd-out');
-        pc = new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-        const s = await navigator.mediaDevices.getUserMedia({audio:true});
-        s.getTracks().forEach(t => pc.addTrack(t, s));
-        pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${activeId}/c`), e.candidate.toJSON());
-        pc.ontrack = e => document.getElementById('remote-audio').srcObject = e.streams[0];
-        const o = await pc.createOffer(); await pc.setLocalDescription(o);
-        await set(ref(db, `calls/${activeId}/o`), {s: o.sdp, t: o.type, f: user.l});
-        onValue(ref(db, `calls/${activeId}/a`), async s => {
-            if(s.exists()){ stop('snd-out'); await pc.setRemoteDescription(new RTCSessionDescription({sdp:s.val().s, type:s.val().t})); }
-        });
-    };
+        const callModal = getEl('call-modal');
+        const callTitle = getEl('call-title');
+        const callUser = getEl('call-user');
+        const hangupBtn = getEl('hangup-btn');
+        const answerBtn = getEl('answer-btn');
+        const muteToggleBtn = getEl('mute-toggle-btn');
 
-    function listen() {
-        onValue(ref(db, 'calls'), s => {
-            s.forEach(c => {
-                const d = c.val();
-                if(c.key.includes(user.l) && d.o && d.o.f !== user.l) {
-                    play('snd-ring'); document.getElementById('call-m').style.display='flex';
-                    document.getElementById('c-st').innerText = "Входящий от " + d.o.f;
-                    const ab = document.getElementById('ans-b'); ab.style.display='block';
-                    ab.onclick = async () => {
-                        stop('snd-ring'); ab.style.display='none';
-                        pc = new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-                        const st = await navigator.mediaDevices.getUserMedia({audio:true});
-                        st.getTracks().forEach(t => pc.addTrack(t, st));
-                        pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${c.key}/c`), e.candidate.toJSON());
-                        pc.ontrack = e => document.getElementById('remote-audio').srcObject = e.streams[0];
-                        await pc.setRemoteDescription(new RTCSessionDescription({sdp:d.o.s, type:d.o.t}));
-                        const a = await pc.createAnswer(); await pc.setLocalDescription(a);
-                        await set(ref(db, `calls/${c.key}/a`), {s: a.sdp, t: a.type});
-                        onValue(ref(db, `calls/${c.key}/c`), cs => { cs.forEach(cand => pc.addIceCandidate(new RTCIceCandidate(cand.val()))); });
-                    };
+        callModal.style.display = 'flex';
+        callTitle.innerText = "Вызов...";
+        callUser.innerText = activeId.replace(user.login,'').replace('___','');
+        answerBtn.style.display = 'none';
+        hangupBtn.style.display = 'block';
+
+        try {
+            pc = new RTCPeerConnection(rtcConfig);
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+            pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${activeId}/candi`), e.candidate.toJSON());
+            pc.ontrack = e => getEl('remote-audio').srcObject = e.streams[0];
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            await set(ref(db, `calls/${activeId}/offer`), { sdp: offer.sdp, type: offer.type, from: user.login });
+
+            onValue(ref(db, `calls/${activeId}/answer`), async s => {
+                if(s.exists() && s.val().type === 'answer' && pc.signalingState !== 'closed' && !pc.remoteDescription) {
+                    await pc.setRemoteDescription(new RTCSessionDescription(s.val()));
+                    callTitle.innerText = "Разговор...";
                 }
             });
-        });
+            onValue(ref(db, `calls/${activeId}/candi`), s => {
+                s.forEach(c => {
+                    const candidate = new RTCIceCandidate(c.val());
+                    pc.addIceCandidate(candidate).catch(e => console.warn("Error adding ICE candidate:", e));
+                });
+            });
+
+            onValue(ref(db, `calls/${activeId}`), (snapshot) => {
+                if (!snapshot.exists()) {
+                    stopCallAndReset();
+                    alert("Звонок завершён другой стороной.");
+                }
+            }, { onlyOnce: false });
+
+        } catch (error) {
+            console.error("Ошибка при инициализации звонка:", error);
+            alert("Не удалось начать звонок. Убедитесь, что у вас есть микрофон и вы дали разрешение.");
+            stopCallAndReset();
+        }
+
+        muteToggleBtn.onclick = () => {
+            if (localStream) {
+                isMuted = !isMuted;
+                localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+                muteToggleBtn.classList.toggle('active', isMuted);
+                muteToggleBtn.querySelector('i').className = isMuted ? 'fa fa-microphone-alt-slash' : 'fa fa-microphone';
+            }
+        };
     }
 
-    window.showProf = () => { document.getElementById('prof-m').style.display='flex'; document.getElementById('ed-n').value=user.n; };
-    window.saveProf = async () => {
-        const n = document.getElementById('ed-n').value, c = document.getElementById('ed-c').value;
-        await update(ref(db, 'users/'+user.l), {n, c}); location.reload();
-    };
+    function listenForCalls() {
+        onValue(ref(db, `calls`), snap => {
+            snap.forEach(call => {
+                const data = call.val();
+                if(call.key.includes(user.login) && data.offer && data.offer.from !== user.login) {
+                    if (activeId !== call.key && getEl('call-modal').style.display !== 'flex') {
+                           showIncoming(call.key, data.offer);
+                    }
+                }
+            });
+        }, { onlyOnce: false });
+    }
+
+    async function showIncoming(id, offer) {
+        const callModal = getEl('call-modal');
+        const callTitle = getEl('call-title');
+        const callUser = getEl('call-user');
+        const ansBtn = getEl('answer-btn');
+        const hangupBtn = getEl('hangup-btn');
+        const muteToggleBtn = getEl('mute-toggle-btn');
+        
+        if (callModal.style.display === 'flex' && activeId) {
+            await remove(ref(db, `calls/${id}`));
+            return;
+        }
+
+        callModal.style.display = 'flex';
+        callTitle.innerText = "Входящий вызов";
+        callUser.innerText = offer.from;
+        ansBtn.style.display = 'block';
+        hangupBtn.style.display = 'block';
+
+        activeId = id;
+
+        ansBtn.addEventListener('click', async function ansClickHandler() { // Именованная функция для возможности удаления обработчика
+            try {
+                pc = new RTCPeerConnection(rtcConfig);
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+                pc.onicecandidate = e => e.candidate && push(ref(db, `calls/${id}/candi`), e.candidate.toJSON());
+                pc.ontrack = e => getEl('remote-audio').srcObject = e.streams[0];
+                
+                await pc.setRemoteDescription(new RTCSessionDescription(offer));
+                const ans = await pc.createAnswer();
+                await pc.setLocalDescription(ans);
+                await set(ref(db, `calls/${id}/answer`), { sdp: ans.sdp, type: ans.type });
+                
+                onValue(ref(db, `calls/${id}/candi`), s => s.forEach(c => pc.addIceCandidate(new RTCIceCandidate(c.val())).catch(e => console.warn("Error adding ICE candidate:", e))));
+                
+                ansBtn.style.display = 'none';
+                callTitle.innerText = "Разговор...";
+
+                ansBtn.removeEventListener('click', ansClickHandler); // Удаляем обработчик после использования
+
+                onValue(ref(db, `calls/${id}`), (snapshot) => {
+                    if (!snapshot.exists()) {
+                        stopCallAndReset();
+                        alert("Звонок завершён другой стороной.");
+                    }
+                }, { onlyOnce: false });
+
+            } catch (error) {
+                console.error("Ошибка при приёме звонка:", error);
+                alert("Не удалось принять звонок. Убедитесь, что у вас есть микрофон.");
+                stopCallAndReset();
+            }
+        });
+
+        muteToggleBtn.onclick = () => {
+            if (localStream) {
+                isMuted = !isMuted;
+                localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+                muteToggleBtn.classList.toggle('active', isMuted);
+                muteToggleBtn.querySelector('i').className = isMuted ? 'fa fa-microphone-alt-slash' : 'fa fa-microphone';
+            }
+        };
+    }
+
+    function stopCallAndReset() {
+        if(pc) {
+            pc.close();
+            pc = null;
+        }
+        if(localStream) {
+            localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
+        }
+        isMuted = false;
+        const muteToggleBtn = getEl('mute-toggle-btn');
+        if (muteToggleBtn) {
+            muteToggleBtn.classList.remove('active');
+            muteToggleBtn.querySelector('i').className = 'fa fa-microphone';
+        }
+
+        if(activeId && getEl('call-modal').style.display === 'flex') {
+            remove(ref(db, `calls/${activeId}`)).catch(e => console.error("Ошибка удаления данных звонка:", e));
+        }
+
+        getEl('call-modal').style.display = 'none';
+        getEl('remote-audio').srcObject = null;
+        activeId = null;
+    }
+
+    function openProfile() {
+        getEl('modal-p').style.display='flex';
+        getEl('p-uid').innerText = user.uid;
+    }
+    function copyUID() { navigator.clipboard.writeText(user.uid); alert("ID Скопирован"); }
+    function closeProfileModal() { getEl('modal-p').style.display='none'; }
+
+
+    // --- Привязка обработчиков событий после загрузки DOM и определения функций ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // Кнопки аутентификации
+        const authLoginBtn = getEl('auth-login-btn');
+        if (authLoginBtn) authLoginBtn.addEventListener('click', () => auth('login'));
+
+        const authRegBtn = getEl('auth-reg-btn');
+        if (authRegBtn) authRegBtn.addEventListener('click', () => auth('reg'));
+
+        // Кнопки сайдбара
+        const tabCh = getEl('tab-ch');
+        if (tabCh) tabCh.addEventListener('click', () => setTab('ch'));
+
+        const tabDm = getEl('tab-dm');
+        if (tabDm) tabDm.addEventListener('click', () => setTab('dm'));
+
+        const actionBtn = getEl('action-btn');
+        if (actionBtn) actionBtn.addEventListener('click', handleAction);
+
+        const openProfileBtn = getEl('open-profile-btn');
+        if (openProfileBtn) openProfileBtn.addEventListener('click', openProfile);
+
+        // Кнопки чата
+        const menuToggleBtn = getEl('menu-toggle-btn');
+        if (menuToggleBtn) menuToggleBtn.addEventListener('click', toggleSidebar);
+
+        const callInitBtn = getEl('call-init-btn');
+        if (callInitBtn) callInitBtn.addEventListener('click', startCall);
+
+        const sendMsgBtn = getEl('send-msg-btn');
+        if (sendMsgBtn) sendMsgBtn.addEventListener('click', sendMsg);
+
+        // Кнопки модального окна звонка
+        const hangupBtn = getEl('hangup-btn');
+        if (hangupBtn) hangupBtn.addEventListener('click', stopCallAndReset);
+        // Примечание: answer-btn привязывается внутри showIncoming, mute-toggle-btn.onclick внутри startCall и showIncoming
+
+        // Кнопки модального окна профиля
+        const copyUidBtn = getEl('copy-uid-btn');
+        if (copyUidBtn) copyUidBtn.addEventListener('click', copyUID);
+
+        const logoutBtn = getEl('logout-btn');
+        if (logoutBtn) logoutBtn.addEventListener('click', logout);
+
+        const closeProfileModalBtn = getEl('close-profile-modal-btn');
+        if (closeProfileModalBtn) closeProfileModalBtn.addEventListener('click', closeProfileModal);
+
+
+        // Автоматический вход при наличии сохраненных данных
+        const saved = localStorage.getItem('cloud_v10');
+        if(saved) {
+            const d = JSON.parse(saved);
+            const aLogin = getEl('a-login');
+            if (aLogin) aLogin.value=d.l;
+
+            const aPass = getEl('a-pass');
+            if (aPass) aPass.value=d.p;
+
+            (async () => {
+                 await auth('login');
+            })();
+        } else {
+            const authScreen = getEl('auth-screen');
+            if (authScreen) authScreen.style.display = 'flex';
+        }
+    });
+
 </script>
 </body>
 </html>
