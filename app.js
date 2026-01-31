@@ -6,35 +6,23 @@ const firebaseConfig = {
     projectId: "max-pinlab",
     storageBucket: "max-pinlab.firebasestorage.app",
     messagingSenderId: "708865541327",
-    appId: "1:708865541327:web:8cf92cffebc1c3c63e23ba",
-    measurementId: "G-44D7FE0GJV"
+    appId: "1:708865541327:web:8cf92cffebc1c3c63e23ba"
 };
 
 // Инициализация Firebase
 const app = firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
 const database = firebase.database();
 const storage = firebase.storage();
 
 // Глобальные переменные
 let currentUser = null;
 let currentChat = null;
-let currentTab = 'chats';
 let isAdmin = false;
 let mediaRecorder = null;
 let audioChunks = [];
-let recordingTimer = null;
-let recordingSeconds = 0;
-let callPeerConnection = null;
-let localStream = null;
-let remoteStream = null;
-let isInCall = false;
-let isMuted = false;
-let typingTimeout = null;
 
 // DOM элементы
 const elements = {
-    // Аутентификация
     authScreen: document.getElementById('auth-screen'),
     app: document.getElementById('app'),
     tabLogin: document.getElementById('tab-login'),
@@ -44,70 +32,51 @@ const elements = {
     loginUsername: document.getElementById('login-username'),
     loginPassword: document.getElementById('login-password'),
     registerUsername: document.getElementById('register-username'),
-    registerUserid: document.getElementById('register-userid'),
     registerPassword: document.getElementById('register-password'),
     registerConfirm: document.getElementById('register-confirm'),
     authError: document.getElementById('auth-error'),
     
-    // Верхняя панель
+    // Основное приложение
     menuToggle: document.getElementById('menu-toggle'),
-    currentChatName: document.getElementById('current-chat-name'),
-    currentChatAvatar: document.getElementById('current-chat-avatar'),
-    chatStatus: document.getElementById('chat-status'),
-    callBtn: document.getElementById('call-btn'),
-    adminPanelBtn: document.getElementById('admin-panel-btn'),
-    userMenuBtn: document.getElementById('user-menu-btn'),
-    dropdownMenu: document.querySelector('.dropdown-menu'),
-    
-    // Сайдбар
     sidebar: document.getElementById('sidebar'),
     usernameDisplay: document.getElementById('username-display'),
     userAvatar: document.getElementById('user-avatar'),
-    userStatus: document.getElementById('user-status'),
-    searchInput: document.getElementById('search-input'),
+    adminPanelBtn: document.getElementById('admin-panel-btn'),
     
     // Списки
-    sidebarTabs: document.querySelectorAll('.sidebar-tab'),
     chatsList: document.getElementById('chats-list'),
     contactsList: document.getElementById('contacts-list'),
     groupsList: document.getElementById('groups-list'),
     
     // Чат
     chatMessages: document.getElementById('chat-messages'),
-    typingIndicator: document.getElementById('typing-indicator'),
     messageInput: document.getElementById('message-input'),
     sendBtn: document.getElementById('send-btn'),
-    attachFileBtn: document.getElementById('attach-file-btn'),
-    attachImageBtn: document.getElementById('attach-image-btn'),
-    voiceRecordBtn: document.getElementById('voice-record-btn'),
-    fileInput: document.getElementById('file-input'),
-    imageInput: document.getElementById('image-input'),
+    currentChatName: document.getElementById('current-chat-name'),
+    chatStatus: document.getElementById('chat-status'),
+    callBtn: document.getElementById('call-btn'),
     
-    // Модальные окна
+    // Модалки
     modals: document.querySelectorAll('.modal'),
     closeModalBtns: document.querySelectorAll('.close-modal'),
-    
-    // Админ панель
-    adminModal: document.getElementById('admin-modal'),
-    adminTabs: document.querySelectorAll('.admin-tab'),
-    usersTable: document.getElementById('users-table'),
-    groupsAdminTable: document.getElementById('groups-admin-table'),
-    chatsAdminTable: document.getElementById('chats-admin-table'),
-    
-    // Профиль
+    addFriendModal: document.getElementById('add-friend-modal'),
+    createGroupModal: document.getElementById('create-group-modal'),
+    joinGroupModal: document.getElementById('join-group-modal'),
     profileModal: document.getElementById('profile-modal'),
-    profileUsername: document.getElementById('profile-username'),
-    profileUserid: document.getElementById('profile-userid'),
-    profileStatus: document.getElementById('profile-status'),
-    
-    // Звонки
-    callModal: document.getElementById('call-modal'),
+    adminModal: document.getElementById('admin-modal'),
     voiceModal: document.getElementById('voice-modal'),
-    imageModal: document.getElementById('image-modal')
+    callModal: document.getElementById('call-modal')
 };
 
 // Утилиты
 function showNotification(message, type = 'info') {
+    const notifications = document.getElementById('notifications') || (() => {
+        const div = document.createElement('div');
+        div.id = 'notifications';
+        document.body.appendChild(div);
+        return div;
+    })();
+    
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.innerHTML = `
@@ -117,7 +86,7 @@ function showNotification(message, type = 'info') {
         </div>
     `;
     
-    document.getElementById('notifications').appendChild(notification);
+    notifications.appendChild(notification);
     
     setTimeout(() => {
         notification.style.animation = 'slideIn 0.3s reverse';
@@ -127,16 +96,7 @@ function showNotification(message, type = 'info') {
 
 function formatTime(timestamp) {
     const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now - date;
-    
-    if (diff < 86400000) { // Сегодня
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else if (diff < 604800000) { // На этой неделе
-        return date.toLocaleDateString([], { weekday: 'short' });
-    } else {
-        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    }
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function generateChatId(user1, user2) {
@@ -146,8 +106,11 @@ function generateChatId(user1, user2) {
 // Аутентификация
 async function login(username, password) {
     try {
+        console.log('Попытка входа:', username);
+        
+        // Проверка администратора
         if (username === 'мокасин' && password === '123321') {
-            // Администратор
+            console.log('Вход как администратор');
             currentUser = {
                 uid: '123',
                 username: 'мокасин',
@@ -156,26 +119,36 @@ async function login(username, password) {
                 status: 'online'
             };
             isAdmin = true;
+            
+            // Сохраняем в базу данных
+            await database.ref(`users/мокасин`).set({
+                username: 'мокасин',
+                userid: '123',
+                password: '123321',
+                isAdmin: true,
+                status: 'online',
+                createdAt: Date.now()
+            });
+            
             await initializeUser();
             return true;
         }
         
-        // Проверка в базе данных
+        // Проверка обычного пользователя
         const userRef = database.ref(`users/${username}`);
         const snapshot = await userRef.once('value');
         
         if (!snapshot.exists()) {
-            throw new Error('Пользователь не найден');
+            showNotification('Пользователь не найден', 'error');
+            return false;
         }
         
         const userData = snapshot.val();
+        console.log('Данные пользователя:', userData);
         
         if (userData.password !== password) {
-            throw new Error('Неверный пароль');
-        }
-        
-        if (userData.banned) {
-            throw new Error('Аккаунт заблокирован');
+            showNotification('Неверный пароль', 'error');
+            return false;
         }
         
         currentUser = {
@@ -198,97 +171,106 @@ async function login(username, password) {
         return true;
         
     } catch (error) {
-        console.error('Login error:', error);
-        elements.authError.textContent = error.message;
+        console.error('Ошибка входа:', error);
+        showNotification('Ошибка входа: ' + error.message, 'error');
         return false;
     }
 }
 
 async function register(username, userid, password, confirmPassword) {
     try {
+        console.log('Регистрация:', username, userid);
+        
         if (!username || !userid || !password) {
-            throw new Error('Заполните все поля');
+            showNotification('Заполните все поля', 'error');
+            return;
         }
         
         if (password !== confirmPassword) {
-            throw new Error('Пароли не совпадают');
+            showNotification('Пароли не совпадают', 'error');
+            return;
         }
         
         if (password.length < 6) {
-            throw new Error('Пароль должен быть не менее 6 символов');
+            showNotification('Пароль должен быть не менее 6 символов', 'error');
+            return;
         }
         
-        // Проверка уникальности
-        const usernameRef = database.ref(`users/${username}`);
-        const useridRef = database.ref(`userids/${userid}`);
+        // Проверяем уникальность
+        const usersRef = database.ref('users');
+        const snapshot = await usersRef.once('value');
+        let userExists = false;
+        let userIdExists = false;
         
-        const [usernameSnap, useridSnap] = await Promise.all([
-            usernameRef.once('value'),
-            useridRef.once('value')
-        ]);
+        snapshot.forEach(child => {
+            const user = child.val();
+            if (user.username === username) userExists = true;
+            if (user.userid === userid) userIdExists = true;
+        });
         
-        if (usernameSnap.exists()) {
-            throw new Error('Этот никнейм уже занят');
+        if (userExists) {
+            showNotification('Этот никнейм уже занят', 'error');
+            return;
         }
         
-        if (useridSnap.exists()) {
-            throw new Error('Этот ID уже занят');
+        if (userIdExists) {
+            showNotification('Этот ID уже занят', 'error');
+            return;
         }
         
         // Создаем пользователя
-        await usernameRef.set({
+        await database.ref(`users/${username}`).set({
+            username: username,
             userid: userid,
             password: password,
-            username: username,
             status: 'online',
             createdAt: Date.now(),
             lastSeen: Date.now(),
             isAdmin: false
         });
         
-        await useridRef.set({
-            username: username
-        });
-        
-        showNotification('Регистрация успешна!', 'success');
+        showNotification('Регистрация успешна! Теперь войдите в систему.', 'success');
         switchAuthTab('login');
         
     } catch (error) {
-        console.error('Register error:', error);
-        elements.authError.textContent = error.message;
+        console.error('Ошибка регистрации:', error);
+        showNotification('Ошибка регистрации: ' + error.message, 'error');
     }
 }
 
 async function logout() {
     if (currentUser) {
-        const userRef = database.ref(`users/${currentUser.username}`);
-        await userRef.update({
-            status: 'offline',
-            lastSeen: Date.now()
-        });
+        try {
+            await database.ref(`users/${currentUser.username}`).update({
+                status: 'offline',
+                lastSeen: Date.now()
+            });
+        } catch (error) {
+            console.error('Ошибка выхода:', error);
+        }
     }
     
     currentUser = null;
     isAdmin = false;
     elements.authScreen.style.display = 'flex';
     elements.app.style.display = 'none';
-    window.location.reload();
 }
 
 // Инициализация пользователя
 async function initializeUser() {
+    console.log('Инициализация пользователя:', currentUser);
+    
     // Скрываем экран аутентификации
     elements.authScreen.style.display = 'none';
     elements.app.style.display = 'flex';
     
     // Обновляем информацию о пользователе
     elements.usernameDisplay.textContent = currentUser.username;
-    elements.userStatus.textContent = 'В сети';
-    elements.userStatus.className = 'user-status online';
     
     // Показываем кнопку админ-панели для администратора
     if (isAdmin) {
         elements.adminPanelBtn.style.display = 'block';
+        showNotification('Вы вошли как администратор', 'success');
     }
     
     // Загружаем данные
@@ -322,23 +304,14 @@ function setupStatusListener() {
             });
         }
     });
-    
-    // Слушаем изменения статуса контактов
-    const contactsRef = database.ref('users');
-    contactsRef.on('value', (snapshot) => {
-        snapshot.forEach((child) => {
-            const user = child.val();
-            if (user.username !== currentUser.username) {
-                updateContactStatus(user.username, user.status);
-            }
-        });
-    });
 }
 
 // Загрузка контактов
 async function loadContacts() {
-    const contactsRef = database.ref('users');
-    contactsRef.on('value', (snapshot) => {
+    console.log('Загрузка контактов');
+    
+    const usersRef = database.ref('users');
+    usersRef.on('value', (snapshot) => {
         elements.contactsList.innerHTML = '';
         snapshot.forEach((child) => {
             const user = child.val();
@@ -353,7 +326,6 @@ function addContactToList(user) {
     const contactItem = document.createElement('div');
     contactItem.className = 'contact-item';
     contactItem.dataset.username = user.username;
-    contactItem.dataset.userid = user.userid;
     
     contactItem.innerHTML = `
         <div class="item-avatar">
@@ -370,15 +342,10 @@ function addContactToList(user) {
     elements.contactsList.appendChild(contactItem);
 }
 
-function updateContactStatus(username, status) {
-    const contactItem = document.querySelector(`.contact-item[data-username="${username}"] .item-status`);
-    if (contactItem) {
-        contactItem.className = `item-status ${status === 'online' ? 'online' : 'offline'}`;
-    }
-}
-
 // Загрузка чатов
 async function loadChats() {
+    console.log('Загрузка чатов');
+    
     if (!currentUser) return;
     
     const chatsRef = database.ref(`user_chats/${currentUser.username}`);
@@ -387,14 +354,13 @@ async function loadChats() {
         const chats = snapshot.val() || {};
         
         for (const chatId in chats) {
-            await addChatToList(chatId, chats[chatId]);
+            await addChatToList(chatId);
         }
     });
 }
 
-async function addChatToList(chatId, chatData) {
-    let chatName = '';
-    let lastMessage = '';
+async function addChatToList(chatId) {
+    let chatName = 'Чат';
     let isGroup = chatId.startsWith('group_');
     
     if (isGroup) {
@@ -407,27 +373,17 @@ async function addChatToList(chatId, chatData) {
         }
     } else {
         // Личный чат
-        const otherUsername = chatId.split('_').find(u => u !== currentUser.username);
-        if (otherUsername) {
-            const userRef = database.ref(`users/${otherUsername}`);
+        const participants = chatId.split('_');
+        const otherUser = participants.find(u => u !== currentUser.username);
+        if (otherUser) {
+            const userRef = database.ref(`users/${otherUser}`);
             const userSnap = await userRef.once('value');
             if (userSnap.exists()) {
                 const user = userSnap.val();
-                chatName = user.username || otherUsername;
+                chatName = user.username || otherUser;
             }
         }
     }
-    
-    // Получаем последнее сообщение
-    const messagesRef = database.ref(`messages/${chatId}`).limitToLast(1);
-    messagesRef.once('value', (snapshot) => {
-        snapshot.forEach((child) => {
-            const message = child.val();
-            lastMessage = message.text || (message.type === 'image' ? '📷 Изображение' : 
-                         message.type === 'file' ? '📎 Файл' : 
-                         message.type === 'voice' ? '🎤 Голосовое сообщение' : '');
-        });
-    });
     
     const chatItem = document.createElement('div');
     chatItem.className = 'chat-item';
@@ -439,9 +395,8 @@ async function addChatToList(chatId, chatData) {
         </div>
         <div class="item-info">
             <div class="item-name">${chatName}</div>
-            <div class="item-last-message">${lastMessage}</div>
+            <div class="item-last-message">Нажмите чтобы открыть</div>
         </div>
-        <div class="item-time">${formatTime(Date.now())}</div>
     `;
     
     chatItem.addEventListener('click', () => openChat(chatId, isGroup ? 'group' : 'private'));
@@ -450,6 +405,8 @@ async function addChatToList(chatId, chatData) {
 
 // Загрузка групп
 async function loadGroups() {
+    console.log('Загрузка групп');
+    
     if (!currentUser) return;
     
     const groupsRef = database.ref('groups');
@@ -485,6 +442,8 @@ function addGroupToList(groupId, group) {
 
 // Открытие чата
 async function openChat(chatId, type) {
+    console.log('Открытие чата:', chatId, type);
+    
     currentChat = { id: chatId, type: type };
     
     // Обновляем активный элемент
@@ -506,7 +465,7 @@ async function openChat(chatId, type) {
             if (userSnap.exists()) {
                 const user = userSnap.val();
                 elements.currentChatName.textContent = user.username;
-                elements.chatStatus.textContent = user.status === 'online' ? 'онлайн' : 'был(а) недавно';
+                elements.chatStatus.textContent = user.status === 'online' ? 'онлайн' : 'не в сети';
                 elements.chatStatus.className = `chat-status ${user.status === 'online' ? 'online' : 'offline'}`;
             }
         }
@@ -535,6 +494,8 @@ async function openChat(chatId, type) {
 
 // Загрузка сообщений
 function loadMessages(chatId) {
+    console.log('Загрузка сообщений для чата:', chatId);
+    
     elements.chatMessages.innerHTML = '';
     
     const messagesRef = database.ref(`messages/${chatId}`);
@@ -550,36 +511,6 @@ function loadMessages(chatId) {
             elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
         }, 100);
     });
-    
-    // Слушаем набор текста
-    const typingRef = database.ref(`typing/${chatId}/${currentUser.username}`);
-    typingRef.onDisconnect().remove();
-    
-    elements.messageInput.addEventListener('input', () => {
-        typingRef.set(true);
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
-            typingRef.remove();
-        }, 1000);
-    });
-    
-    // Слушаем набор текста других пользователей
-    database.ref(`typing/${chatId}`).on('value', (snapshot) => {
-        const typers = [];
-        snapshot.forEach((child) => {
-            if (child.key !== currentUser.username) {
-                typers.push(child.key);
-            }
-        });
-        
-        if (typers.length > 0) {
-            elements.typingIndicator.style.display = 'flex';
-            elements.typingIndicator.querySelector('span').textContent = 
-                `${typers.join(', ')} печатает${typers.length > 1 ? 'ют' : ''}...`;
-        } else {
-            elements.typingIndicator.style.display = 'none';
-        }
-    });
 }
 
 function addMessageToChat(message) {
@@ -588,40 +519,31 @@ function addMessageToChat(message) {
     
     let content = '';
     
-    switch (message.type) {
-        case 'text':
-            content = `<div class="message-text">${message.text}</div>`;
-            break;
-            
-        case 'image':
-            content = `
-                <div class="message-text">${message.text || ''}</div>
-                <img src="${message.url}" alt="Изображение" class="message-image" onclick="viewImage('${message.url}')">
-            `;
-            break;
-            
-        case 'file':
-            content = `
-                <div class="message-text">${message.text || ''}</div>
-                <div class="message-file">
-                    <i class="fas fa-file"></i>
-                    <a href="${message.url}" download="${message.filename}">${message.filename}</a>
-                    <span>(${(message.size / 1024).toFixed(1)} KB)</span>
-                </div>
-            `;
-            break;
-            
-        case 'voice':
-            content = `
-                <div class="message-text">${message.text || ''}</div>
-                <div class="message-voice">
-                    <button class="voice-control" onclick="playVoice('${message.url}')">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <span class="voice-duration">${message.duration || 0}s</span>
-                </div>
-            `;
-            break;
+    if (message.type === 'text') {
+        content = `<div class="message-text">${message.text}</div>`;
+    } else if (message.type === 'image') {
+        content = `
+            <div class="message-text">${message.text || ''}</div>
+            <img src="${message.url}" alt="Изображение" class="message-image" onclick="viewImage('${message.url}')">
+        `;
+    } else if (message.type === 'file') {
+        content = `
+            <div class="message-text">${message.text || ''}</div>
+            <div class="message-file">
+                <i class="fas fa-file"></i>
+                <a href="${message.url}" download="${message.filename}">${message.filename}</a>
+            </div>
+        `;
+    } else if (message.type === 'voice') {
+        content = `
+            <div class="message-text">${message.text || ''}</div>
+            <div class="message-voice">
+                <button class="voice-control" onclick="playVoice('${message.url}')">
+                    <i class="fas fa-play"></i>
+                </button>
+                <span class="voice-duration">${message.duration || 0}s</span>
+            </div>
+        `;
     }
     
     messageDiv.innerHTML = `
@@ -639,7 +561,10 @@ function addMessageToChat(message) {
 
 // Отправка сообщений
 async function sendMessage() {
-    if (!currentChat || !elements.messageInput.value.trim()) return;
+    if (!currentChat || !elements.messageInput.value.trim()) {
+        showNotification('Введите сообщение', 'error');
+        return;
+    }
     
     const message = {
         sender: currentUser.username,
@@ -648,674 +573,43 @@ async function sendMessage() {
         timestamp: Date.now()
     };
     
-    const messageRef = database.ref(`messages/${currentChat.id}`).push();
-    await messageRef.set(message);
-    
-    elements.messageInput.value = '';
-    elements.messageInput.style.height = 'auto';
-}
-
-async function sendFile(file, type) {
-    if (!currentChat) return;
-    
     try {
-        // Загружаем файл в Storage
-        const storageRef = storage.ref(`chat_files/${currentChat.id}/${Date.now()}_${file.name}`);
-        const uploadTask = storageRef.put(file);
+        const messageRef = database.ref(`messages/${currentChat.id}`).push();
+        await messageRef.set(message);
         
-        uploadTask.on('state_changed',
-            (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                console.log('Upload progress:', progress);
-            },
-            (error) => {
-                console.error('Upload error:', error);
-                showNotification('Ошибка загрузки файла', 'error');
-            },
-            async () => {
-                const url = await uploadTask.snapshot.ref.getDownloadURL();
-                
-                const message = {
-                    sender: currentUser.username,
-                    type: type,
-                    url: url,
-                    filename: file.name,
-                    size: file.size,
-                    timestamp: Date.now()
-                };
-                
-                if (type === 'image') {
-                    message.text = '📷 Изображение';
-                } else if (type === 'voice') {
-                    message.duration = recordingSeconds;
-                    message.text = '🎤 Голосовое сообщение';
-                } else {
-                    message.text = '📎 Файл';
-                }
-                
-                const messageRef = database.ref(`messages/${currentChat.id}`).push();
-                await messageRef.set(message);
-                
-                showNotification('Файл отправлен', 'success');
-            }
-        );
+        elements.messageInput.value = '';
+        showNotification('Сообщение отправлено', 'success');
         
     } catch (error) {
-        console.error('Send file error:', error);
-        showNotification('Ошибка отправки файла', 'error');
+        console.error('Ошибка отправки сообщения:', error);
+        showNotification('Ошибка отправки сообщения', 'error');
     }
 }
 
-// Голосовые сообщения
-async function startVoiceRecording() {
+// Добавление друга
+async function addFriend(friendId) {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-        recordingSeconds = 0;
-        
-        mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                audioChunks.push(event.data);
-            }
-        };
-        
-        mediaRecorder.start();
-        
-        // Показываем модалку записи
-        elements.voiceModal.classList.add('active');
-        
-        // Запускаем таймер
-        recordingTimer = setInterval(() => {
-            recordingSeconds++;
-            const minutes = Math.floor(recordingSeconds / 60).toString().padStart(2, '0');
-            const seconds = (recordingSeconds % 60).toString().padStart(2, '0');
-            document.getElementById('voice-timer').textContent = `${minutes}:${seconds}`;
-        }, 1000);
-        
-    } catch (error) {
-        console.error('Voice recording error:', error);
-        showNotification('Ошибка доступа к микрофону', 'error');
-    }
-}
-
-async function stopVoiceRecording() {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-    }
-    
-    if (recordingTimer) {
-        clearInterval(recordingTimer);
-        recordingTimer = null;
-    }
-    
-    elements.voiceModal.classList.remove('active');
-}
-
-async function sendVoiceMessage() {
-    if (audioChunks.length === 0) return;
-    
-    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-    const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
-    
-    await sendFile(audioFile, 'voice');
-    
-    // Сбрасываем запись
-    audioChunks = [];
-    recordingSeconds = 0;
-}
-
-// Звонки
-async function startCall() {
-    if (!currentChat || currentChat.type !== 'private') return;
-    
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        callPeerConnection = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
-        
-        // Добавляем локальный поток
-        localStream.getTracks().forEach(track => {
-            callPeerConnection.addTrack(track, localStream);
-        });
-        
-        // Получаем удаленный поток
-        callPeerConnection.ontrack = (event) => {
-            remoteStream = event.streams[0];
-            document.getElementById('remote-audio').srcObject = remoteStream;
-        };
-        
-        // Создаем предложение
-        const offer = await callPeerConnection.createOffer();
-        await callPeerConnection.setLocalDescription(offer);
-        
-        // Сохраняем в базу
-        const callRef = database.ref(`calls/${currentChat.id}`);
-        await callRef.set({
-            from: currentUser.username,
-            offer: offer,
-            timestamp: Date.now(),
-            status: 'calling'
-        });
-        
-        // Слушаем ответ
-        callRef.on('value', async (snapshot) => {
-            const callData = snapshot.val();
-            if (callData && callData.answer && !callPeerConnection.remoteDescription) {
-                await callPeerConnection.setRemoteDescription(new RTCSessionDescription(callData.answer));
-            }
-            
-            if (callData && callData.status === 'ended') {
-                endCall();
-            }
-        });
-        
-        // Показываем модалку звонка
-        isInCall = true;
-        elements.callModal.classList.add('active');
-        document.getElementById('call-username').textContent = elements.currentChatName.textContent;
-        document.getElementById('call-status').textContent = 'Вызов...';
-        
-    } catch (error) {
-        console.error('Call error:', error);
-        showNotification('Ошибка начала звонка', 'error');
-        endCall();
-    }
-}
-
-function endCall() {
-    if (callPeerConnection) {
-        callPeerConnection.close();
-        callPeerConnection = null;
-    }
-    
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
-    
-    if (currentChat) {
-        database.ref(`calls/${currentChat.id}`).set({
-            status: 'ended'
-        });
-    }
-    
-    isInCall = false;
-    elements.callModal.classList.remove('active');
-}
-
-// Слушатель входящих звонков
-function setupCallListener() {
-    if (!currentUser) return;
-    
-    database.ref('calls').on('child_added', async (snapshot) => {
-        const callData = snapshot.val();
-        const chatId = snapshot.key;
-        
-        if (chatId.includes(currentUser.username) && callData.from !== currentUser.username && callData.status === 'calling') {
-            // Входящий звонок
-            const accept = confirm(`${callData.from} звонит вам. Принять звонок?`);
-            
-            if (accept) {
-                try {
-                    // Принимаем звонок
-                    currentChat = { id: chatId, type: 'private' };
-                    await openChat(chatId, 'private');
-                    
-                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                    callPeerConnection = new RTCPeerConnection({
-                        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-                    });
-                    
-                    localStream.getTracks().forEach(track => {
-                        callPeerConnection.addTrack(track, localStream);
-                    });
-                    
-                    callPeerConnection.ontrack = (event) => {
-                        remoteStream = event.streams[0];
-                        document.getElementById('remote-audio').srcObject = remoteStream;
-                    };
-                    
-                    await callPeerConnection.setRemoteDescription(new RTCSessionDescription(callData.offer));
-                    
-                    const answer = await callPeerConnection.createAnswer();
-                    await callPeerConnection.setLocalDescription(answer);
-                    
-                    await database.ref(`calls/${chatId}`).update({
-                        answer: answer,
-                        status: 'connected'
-                    });
-                    
-                    isInCall = true;
-                    elements.callModal.classList.add('active');
-                    document.getElementById('call-username').textContent = callData.from;
-                    document.getElementById('call-status').textContent = 'Разговор';
-                    
-                } catch (error) {
-                    console.error('Accept call error:', error);
-                    showNotification('Ошибка приема звонка', 'error');
-                    endCall();
-                }
-            } else {
-                // Отклоняем звонок
-                await database.ref(`calls/${chatId}`).update({
-                    status: 'rejected'
-                });
-            }
-        }
-    });
-}
-
-// Админ-панель
-async function loadAdminData() {
-    if (!isAdmin) return;
-    
-    // Загружаем пользователей
-    const usersRef = database.ref('users');
-    usersRef.on('value', (snapshot) => {
-        elements.usersTable.innerHTML = '';
-        snapshot.forEach((child) => {
-            const user = child.val();
-            addUserToAdminTable(child.key, user);
-        });
-    });
-    
-    // Загружаем группы
-    const groupsRef = database.ref('groups');
-    groupsRef.on('value', (snapshot) => {
-        elements.groupsAdminTable.innerHTML = '';
-        snapshot.forEach((child) => {
-            const group = child.val();
-            addGroupToAdminTable(child.key, group);
-        });
-    });
-    
-    // Загружаем чаты
-    const chatsRef = database.ref('messages');
-    chatsRef.on('value', (snapshot) => {
-        elements.chatsAdminTable.innerHTML = '';
-        snapshot.forEach((child) => {
-            addChatToAdminTable(child.key);
-        });
-    });
-}
-
-function addUserToAdminTable(username, user) {
-    const row = document.createElement('tr');
-    
-    row.innerHTML = `
-        <td><code>${user.userid}</code></td>
-        <td>${username}</td>
-        <td>
-            <span class="item-status ${user.status === 'online' ? 'online' : 'offline'}"></span>
-            ${user.status === 'online' ? 'В сети' : 'Не в сети'}
-        </td>
-        <td>${new Date(user.createdAt).toLocaleDateString()}</td>
-        <td>
-            <button class="btn-icon" onclick="adminMessageUser('${username}')" title="Написать">
-                <i class="fas fa-comment"></i>
-            </button>
-            ${!user.isAdmin ? `
-                <button class="btn-icon" onclick="adminBanUser('${username}')" title="Заблокировать">
-                    <i class="fas fa-ban"></i>
-                </button>
-                <button class="btn-icon" onclick="adminDeleteUser('${username}')" title="Удалить">
-                    <i class="fas fa-trash"></i>
-                </button>
-            ` : ''}
-        </td>
-    `;
-    
-    elements.usersTable.appendChild(row);
-}
-
-function addGroupToAdminTable(groupId, group) {
-    const row = document.createElement('tr');
-    
-    row.innerHTML = `
-        <td><code>${groupId}</code></td>
-        <td>${group.name || 'Группа'}</td>
-        <td>${group.creator || 'Неизвестно'}</td>
-        <td>${Object.keys(group.members || {}).length}</td>
-        <td>
-            <button class="btn-icon" onclick="adminJoinGroup('${groupId}')" title="Присоединиться">
-                <i class="fas fa-sign-in-alt"></i>
-            </button>
-            <button class="btn-icon" onclick="adminDeleteGroup('${groupId}')" title="Удалить">
-                <i class="fas fa-trash"></i>
-            </button>
-        </td>
-    `;
-    
-    elements.groupsAdminTable.appendChild(row);
-}
-
-async function addChatToAdminTable(chatId) {
-    let chatInfo = '';
-    let participants = [];
-    
-    if (chatId.startsWith('group_')) {
-        chatInfo = 'Группа';
-        const groupRef = database.ref(`groups/${chatId}`);
-        const groupSnap = await groupRef.once('value');
-        if (groupSnap.exists()) {
-            const group = groupSnap.val();
-            participants = Object.keys(group.members || {});
-        }
-    } else {
-        chatInfo = 'Личный чат';
-        participants = chatId.split('_');
-    }
-    
-    // Получаем последнее сообщение
-    let lastMessage = '';
-    const messagesRef = database.ref(`messages/${chatId}`).limitToLast(1);
-    const messagesSnap = await messagesRef.once('value');
-    messagesSnap.forEach((child) => {
-        const message = child.val();
-        lastMessage = message.text || 'Медиа-сообщение';
-    });
-    
-    const row = document.createElement('tr');
-    
-    row.innerHTML = `
-        <td><code>${chatId}</code></td>
-        <td>${chatInfo}</td>
-        <td>${participants.join(', ')}</td>
-        <td>${lastMessage.substring(0, 30)}${lastMessage.length > 30 ? '...' : ''}</td>
-        <td>
-            <button class="btn-icon" onclick="adminJoinChat('${chatId}')" title="Присоединиться">
-                <i class="fas fa-sign-in-alt"></i>
-            </button>
-            <button class="btn-icon" onclick="adminClearChat('${chatId}')" title="Очистить">
-                <i class="fas fa-broom"></i>
-            </button>
-        </td>
-    `;
-    
-    elements.chatsAdminTable.appendChild(row);
-}
-
-// Админ-действия
-async function adminMessageUser(username) {
-    const chatId = generateChatId(currentUser.username, username);
-    await openChat(chatId, 'private');
-    elements.adminModal.classList.remove('active');
-}
-
-async function adminJoinGroup(groupId) {
-    await openChat(groupId, 'group');
-    elements.adminModal.classList.remove('active');
-}
-
-async function adminJoinChat(chatId) {
-    const type = chatId.startsWith('group_') ? 'group' : 'private';
-    await openChat(chatId, type);
-    elements.adminModal.classList.remove('active');
-}
-
-async function adminBanUser(username) {
-    if (confirm(`Заблокировать пользователя ${username}?`)) {
-        await database.ref(`users/${username}`).update({
-            banned: true
-        });
-        showNotification(`Пользователь ${username} заблокирован`, 'success');
-    }
-}
-
-async function adminDeleteUser(username) {
-    if (confirm(`Удалить пользователя ${username}? Это действие нельзя отменить.`)) {
-        await database.ref(`users/${username}`).remove();
-        showNotification(`Пользователь ${username} удален`, 'success');
-    }
-}
-
-async function adminDeleteGroup(groupId) {
-    if (confirm(`Удалить группу ${groupId}?`)) {
-        await database.ref(`groups/${groupId}`).remove();
-        await database.ref(`messages/${groupId}`).remove();
-        showNotification(`Группа удалена`, 'success');
-    }
-}
-
-async function adminClearChat(chatId) {
-    if (confirm(`Очистить чат ${chatId}?`)) {
-        await database.ref(`messages/${chatId}`).remove();
-        showNotification(`Чат очищен`, 'success');
-    }
-}
-
-// Управление вкладками
-function switchAuthTab(tab) {
-    elements.tabLogin.classList.toggle('active', tab === 'login');
-    elements.tabRegister.classList.toggle('active', tab === 'register');
-    elements.loginForm.style.display = tab === 'login' ? 'block' : 'none';
-    elements.registerForm.style.display = tab === 'register' ? 'block' : 'none';
-    elements.authError.textContent = '';
-}
-
-function switchSidebarTab(tab) {
-    elements.sidebarTabs.forEach(tabEl => {
-        tabEl.classList.toggle('active', tabEl.dataset.tab === tab);
-    });
-    
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.toggle('active', content.id === `${tab}-tab`);
-    });
-    
-    currentTab = tab;
-}
-
-function switchAdminTab(tab) {
-    elements.adminTabs.forEach(tabEl => {
-        tabEl.classList.toggle('active', tabEl.dataset.tab === tab);
-    });
-    
-    document.querySelectorAll('.tab-pane').forEach(pane => {
-        pane.classList.toggle('active', pane.id === `${tab}-tab`);
-    });
-}
-
-// Инициализация приложения
-function initApp() {
-    // Переключение вкладок аутентификации
-    elements.tabLogin.addEventListener('click', () => switchAuthTab('login'));
-    elements.tabRegister.addEventListener('click', () => switchAuthTab('register'));
-    
-    // Формы аутентификации
-    elements.loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const username = elements.loginUsername.value.trim();
-        const password = elements.loginPassword.value;
-        
-        if (await login(username, password)) {
-            showNotification('Вход выполнен успешно!', 'success');
-        }
-    });
-    
-    elements.registerForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const username = elements.registerUsername.value.trim();
-        const userid = elements.registerUserid.value.trim();
-        const password = elements.registerPassword.value;
-        const confirmPassword = elements.registerConfirm.value;
-        
-        await register(username, userid, password, confirmPassword);
-    });
-    
-    // Меню пользователя
-    elements.userMenuBtn.addEventListener('click', () => {
-        elements.dropdownMenu.style.display = 
-            elements.dropdownMenu.style.display === 'block' ? 'none' : 'block';
-    });
-    
-    // Закрытие меню при клике вне его
-    document.addEventListener('click', (e) => {
-        if (!elements.userMenuBtn.contains(e.target) && !elements.dropdownMenu.contains(e.target)) {
-            elements.dropdownMenu.style.display = 'none';
-        }
-    });
-    
-    // Пункты меню
-    document.getElementById('profile-btn').addEventListener('click', (e) => {
-        e.preventDefault();
-        elements.dropdownMenu.style.display = 'none';
-        
-        elements.profileUsername.textContent = currentUser.username;
-        elements.profileUserid.textContent = currentUser.userid;
-        elements.profileStatus.textContent = 'В сети';
-        elements.profileStatus.className = 'online';
-        
-        elements.profileModal.classList.add('active');
-    });
-    
-    document.getElementById('add-friend-btn').addEventListener('click', (e) => {
-        e.preventDefault();
-        elements.dropdownMenu.style.display = 'none';
-        document.getElementById('add-friend-modal').classList.add('active');
-    });
-    
-    document.getElementById('create-group-btn').addEventListener('click', (e) => {
-        e.preventDefault();
-        elements.dropdownMenu.style.display = 'none';
-        document.getElementById('create-group-modal').classList.add('active');
-    });
-    
-    document.getElementById('join-group-btn').addEventListener('click', (e) => {
-        e.preventDefault();
-        elements.dropdownMenu.style.display = 'none';
-        document.getElementById('join-group-modal').classList.add('active');
-    });
-    
-    document.getElementById('logout-btn').addEventListener('click', (e) => {
-        e.preventDefault();
-        elements.dropdownMenu.style.display = 'none';
-        logout();
-    });
-    
-    // Кнопка админ-панели
-    elements.adminPanelBtn.addEventListener('click', () => {
-        elements.adminModal.classList.add('active');
-        loadAdminData();
-    });
-    
-    // Переключение вкладок сайдбара
-    elements.sidebarTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            switchSidebarTab(tab.dataset.tab);
-        });
-    });
-    
-    // Переключение вкладок админ-панели
-    elements.adminTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            switchAdminTab(tab.dataset.tab);
-        });
-    });
-    
-    // Меню на мобильных устройствах
-    elements.menuToggle.addEventListener('click', () => {
-        elements.sidebar.classList.toggle('active');
-    });
-    
-    // Отправка сообщений
-    elements.sendBtn.addEventListener('click', sendMessage);
-    elements.messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-    
-    // Автоматическое изменение высоты textarea
-    elements.messageInput.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = (this.scrollHeight) + 'px';
-    });
-    
-    // Прикрепление файлов
-    elements.attachFileBtn.addEventListener('click', () => {
-        elements.fileInput.click();
-    });
-    
-    elements.attachImageBtn.addEventListener('click', () => {
-        elements.imageInput.click();
-    });
-    
-    elements.voiceRecordBtn.addEventListener('click', startVoiceRecording);
-    
-    elements.fileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            await sendFile(file, 'file');
-            elements.fileInput.value = '';
-        }
-    });
-    
-    elements.imageInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            await sendFile(file, 'image');
-            elements.imageInput.value = '';
-        }
-    });
-    
-    // Звонки
-    elements.callBtn.addEventListener('click', startCall);
-    
-    // Кнопки модальных окон
-    elements.closeModalBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            btn.closest('.modal').classList.remove('active');
-        });
-    });
-    
-    // Закрытие модальных окон при клике вне их
-    elements.modals.forEach(modal => {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.classList.remove('active');
-            }
-        });
-    });
-    
-    // Голосовые сообщения
-    document.getElementById('stop-voice-btn').addEventListener('click', stopVoiceRecording);
-    document.getElementById('send-voice-btn').addEventListener('click', sendVoiceMessage);
-    
-    // Звонки
-    document.getElementById('hangup-btn').addEventListener('click', endCall);
-    document.getElementById('mute-call-btn').addEventListener('click', () => {
-        isMuted = !isMuted;
-        if (localStream) {
-            localStream.getAudioTracks().forEach(track => {
-                track.enabled = !isMuted;
-            });
-        }
-        document.getElementById('mute-call-btn').innerHTML = 
-            `<i class="fas fa-microphone${isMuted ? '-slash' : ''}"></i>`;
-    });
-    
-    // Добавление друга
-    document.getElementById('add-friend-confirm').addEventListener('click', async () => {
-        const friendId = document.getElementById('friend-id-input').value.trim();
-        
         if (!friendId) {
             showNotification('Введите ID пользователя', 'error');
             return;
         }
         
-        // Находим пользователя по ID
-        const useridRef = database.ref(`userids/${friendId}`);
-        const useridSnap = await useridRef.once('value');
+        // Ищем пользователя по ID
+        const usersRef = database.ref('users');
+        const snapshot = await usersRef.once('value');
+        let friendUsername = null;
         
-        if (!useridSnap.exists()) {
+        snapshot.forEach(child => {
+            const user = child.val();
+            if (user.userid === friendId) {
+                friendUsername = user.username;
+            }
+        });
+        
+        if (!friendUsername) {
             showNotification('Пользователь с таким ID не найден', 'error');
             return;
         }
-        
-        const friendUsername = useridSnap.val().username;
         
         if (friendUsername === currentUser.username) {
             showNotification('Нельзя добавить самого себя', 'error');
@@ -1329,22 +623,25 @@ function initApp() {
         await database.ref(`user_chats/${currentUser.username}/${chatId}`).set(true);
         await database.ref(`user_chats/${friendUsername}/${chatId}`).set(true);
         
-        document.getElementById('add-friend-modal').classList.remove('active');
         showNotification(`Пользователь ${friendUsername} добавлен в контакты`, 'success');
-        document.getElementById('friend-id-input').value = '';
-    });
-    
-    // Создание группы
-    document.getElementById('create-group-confirm').addEventListener('click', async () => {
-        const groupName = document.getElementById('group-name-input').value.trim();
-        const groupId = document.getElementById('group-id-input').value.trim() || `group_${Date.now()}`;
         
+    } catch (error) {
+        console.error('Ошибка добавления друга:', error);
+        showNotification('Ошибка добавления друга', 'error');
+    }
+}
+
+// Создание группы
+async function createGroup(groupName, groupId) {
+    try {
         if (!groupName) {
             showNotification('Введите название группы', 'error');
             return;
         }
         
-        // Проверяем, существует ли группа с таким ID
+        groupId = groupId || `group_${Date.now()}`;
+        
+        // Проверяем, существует ли группа
         const groupRef = database.ref(`groups/${groupId}`);
         const groupSnap = await groupRef.once('value');
         
@@ -1366,16 +663,17 @@ function initApp() {
         // Добавляем группу в список чатов пользователя
         await database.ref(`user_chats/${currentUser.username}/${groupId}`).set(true);
         
-        document.getElementById('create-group-modal').classList.remove('active');
         showNotification(`Группа "${groupName}" создана`, 'success');
-        document.getElementById('group-name-input').value = '';
-        document.getElementById('group-id-input').value = '';
-    });
-    
-    // Вход в группу
-    document.getElementById('join-group-confirm').addEventListener('click', async () => {
-        const groupId = document.getElementById('join-group-id-input').value.trim();
         
+    } catch (error) {
+        console.error('Ошибка создания группы:', error);
+        showNotification('Ошибка создания группы', 'error');
+    }
+}
+
+// Вход в группу
+async function joinGroup(groupId) {
+    try {
         if (!groupId) {
             showNotification('Введите ID группы', 'error');
             return;
@@ -1395,7 +693,6 @@ function initApp() {
         // Проверяем, не участник ли уже пользователь
         if (group.members && group.members[currentUser.username]) {
             showNotification('Вы уже в этой группе', 'info');
-            document.getElementById('join-group-modal').classList.remove('active');
             return;
         }
         
@@ -1405,105 +702,407 @@ function initApp() {
         // Добавляем группу в список чатов пользователя
         await database.ref(`user_chats/${currentUser.username}/${groupId}`).set(true);
         
-        document.getElementById('join-group-modal').classList.remove('active');
         showNotification(`Вы присоединились к группе "${group.name || 'Группа'}"`, 'success');
-        document.getElementById('join-group-id-input').value = '';
-    });
-    
-    // Копирование ID
-    document.getElementById('copy-id-btn').addEventListener('click', () => {
-        navigator.clipboard.writeText(currentUser.userid)
-            .then(() => showNotification('ID скопирован в буфер обмена', 'success'))
-            .catch(() => showNotification('Ошибка копирования', 'error'));
-    });
-    
-    // Админ-действия
-    document.getElementById('ban-user-btn').addEventListener('click', async () => {
-        const userId = document.getElementById('ban-user-id').value.trim();
-        if (!userId) return;
         
-        // Находим пользователя по ID
-        const useridRef = database.ref(`userids/${userId}`);
-        const useridSnap = await useridRef.once('value');
-        
-        if (!useridSnap.exists()) {
-            showNotification('Пользователь не найден', 'error');
-            return;
-        }
-        
-        const username = useridSnap.val().username;
-        await adminBanUser(username);
-        document.getElementById('ban-user-id').value = '';
-    });
-    
-    document.getElementById('mute-user-btn').addEventListener('click', async () => {
-        const userId = document.getElementById('mute-user-id').value.trim();
-        const duration = document.getElementById('mute-duration').value;
-        
-        if (!userId) return;
-        
-        // Находим пользователя по ID
-        const useridRef = database.ref(`userids/${userId}`);
-        const useridSnap = await useridRef.once('value');
-        
-        if (!useridSnap.exists()) {
-            showNotification('Пользователь не найден', 'error');
-            return;
-        }
-        
-        const username = useridSnap.val().username;
-        const muteUntil = Date.now() + (duration * 1000);
-        
-        await database.ref(`muted_users/${username}`).set({
-            mutedUntil: muteUntil,
-            mutedBy: currentUser.username
-        });
-        
-        showNotification(`Пользователь ${username} замучен до ${new Date(muteUntil).toLocaleString()}`, 'success');
-        document.getElementById('mute-user-id').value = '';
-    });
-    
-    document.getElementById('clear-chat-btn').addEventListener('click', async () => {
-        const chatId = document.getElementById('clear-chat-id').value.trim();
-        if (!chatId) return;
-        
-        await adminClearChat(chatId);
-        document.getElementById('clear-chat-id').value = '';
-    });
-    
-    document.getElementById('close-group-btn').addEventListener('click', async () => {
-        const groupId = document.getElementById('close-group-id').value.trim();
-        if (!groupId) return;
-        
-        if (confirm(`Закрыть группу ${groupId} для новых участников?`)) {
-            await database.ref(`groups/${groupId}/closed`).set(true);
-            showNotification('Группа закрыта', 'success');
-            document.getElementById('close-group-id').value = '';
-        }
-    });
-    
-    // Слушатель звонков
-    setupCallListener();
-    
-    // Автоматический вход если есть сохраненные данные
-    const savedUser = localStorage.getItem('max_user');
-    if (savedUser) {
-        const userData = JSON.parse(savedUser);
-        elements.loginUsername.value = userData.username;
-        elements.loginPassword.value = userData.password;
+    } catch (error) {
+        console.error('Ошибка входа в группу:', error);
+        showNotification('Ошибка входа в группу', 'error');
     }
 }
 
-// Глобальные функции для использования в HTML
+// Админ-панель
+async function loadAdminData() {
+    if (!isAdmin) return;
+    
+    console.log('Загрузка данных админ-панели');
+    
+    try {
+        // Загружаем пользователей
+        const usersRef = database.ref('users');
+        const usersSnap = await usersRef.once('value');
+        
+        const usersTable = document.getElementById('users-table');
+        if (usersTable) {
+            usersTable.innerHTML = '';
+            
+            usersSnap.forEach(child => {
+                const user = child.val();
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td><code>${user.userid}</code></td>
+                    <td>${user.username}</td>
+                    <td>${user.status || 'offline'}</td>
+                    <td>${new Date(user.createdAt || Date.now()).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn-icon" onclick="adminMessageUser('${user.username}')" title="Написать">
+                            <i class="fas fa-comment"></i>
+                        </button>
+                    </td>
+                `;
+                
+                usersTable.appendChild(row);
+            });
+        }
+        
+        // Загружаем группы
+        const groupsRef = database.ref('groups');
+        const groupsSnap = await groupsRef.once('value');
+        
+        const groupsTable = document.getElementById('groups-admin-table');
+        if (groupsTable) {
+            groupsTable.innerHTML = '';
+            
+            groupsSnap.forEach(child => {
+                const group = child.val();
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td><code>${child.key}</code></td>
+                    <td>${group.name || 'Группа'}</td>
+                    <td>${group.creator || 'Неизвестно'}</td>
+                    <td>${Object.keys(group.members || {}).length}</td>
+                    <td>
+                        <button class="btn-icon" onclick="adminJoinGroup('${child.key}')" title="Присоединиться">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </button>
+                    </td>
+                `;
+                
+                groupsTable.appendChild(row);
+            });
+        }
+        
+    } catch (error) {
+        console.error('Ошибка загрузки данных админ-панели:', error);
+    }
+}
+
+// Глобальные функции
 window.viewImage = function(url) {
-    document.getElementById('modal-image').src = url;
-    elements.imageModal.classList.add('active');
+    const modal = document.getElementById('image-modal');
+    const img = document.getElementById('modal-image');
+    if (img) img.src = url;
+    if (modal) modal.classList.add('active');
 };
 
 window.playVoice = function(url) {
     const audio = new Audio(url);
-    audio.play();
+    audio.play().catch(error => {
+        console.error('Ошибка воспроизведения голоса:', error);
+        showNotification('Ошибка воспроизведения', 'error');
+    });
 };
 
-// Запуск приложения
+window.adminMessageUser = async function(username) {
+    const chatId = generateChatId(currentUser.username, username);
+    await openChat(chatId, 'private');
+    elements.adminModal.classList.remove('active');
+};
+
+window.adminJoinGroup = async function(groupId) {
+    await openChat(groupId, 'group');
+    elements.adminModal.classList.remove('active');
+};
+
+// Инициализация приложения
+function initApp() {
+    console.log('Инициализация приложения');
+    
+    // Переключение вкладок аутентификации
+    if (elements.tabLogin) {
+        elements.tabLogin.addEventListener('click', () => switchAuthTab('login'));
+    }
+    
+    if (elements.tabRegister) {
+        elements.tabRegister.addEventListener('click', () => switchAuthTab('register'));
+    }
+    
+    // Форма входа
+    if (elements.loginForm) {
+        elements.loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = elements.loginUsername.value.trim();
+            const password = elements.loginPassword.value;
+            
+            if (await login(username, password)) {
+                console.log('Вход выполнен успешно');
+            }
+        });
+    }
+    
+    // Форма регистрации
+    if (elements.registerForm) {
+        elements.registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = elements.registerUsername.value.trim();
+            const userid = elements.registerUserid.value.trim();
+            const password = elements.registerPassword.value;
+            const confirmPassword = elements.registerConfirm.value;
+            
+            await register(username, userid, password, confirmPassword);
+        });
+    }
+    
+    // Отправка сообщений
+    if (elements.sendBtn) {
+        elements.sendBtn.addEventListener('click', sendMessage);
+    }
+    
+    if (elements.messageInput) {
+        elements.messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+    
+    // Меню на мобильных устройствах
+    if (elements.menuToggle) {
+        elements.menuToggle.addEventListener('click', () => {
+            elements.sidebar.classList.toggle('active');
+        });
+    }
+    
+    // Кнопка админ-панели
+    if (elements.adminPanelBtn) {
+        elements.adminPanelBtn.addEventListener('click', () => {
+            elements.adminModal.classList.add('active');
+            loadAdminData();
+        });
+    }
+    
+    // Закрытие модальных окон
+    elements.closeModalBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.closest('.modal').classList.remove('active');
+        });
+    });
+    
+    // Закрытие модальных окон при клике вне их
+    elements.modals.forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        });
+    });
+    
+    // Добавление друга
+    const addFriendConfirm = document.getElementById('add-friend-confirm');
+    if (addFriendConfirm) {
+        addFriendConfirm.addEventListener('click', async () => {
+            const friendId = document.getElementById('friend-id-input').value.trim();
+            await addFriend(friendId);
+            elements.addFriendModal.classList.remove('active');
+        });
+    }
+    
+    // Создание группы
+    const createGroupConfirm = document.getElementById('create-group-confirm');
+    if (createGroupConfirm) {
+        createGroupConfirm.addEventListener('click', async () => {
+            const groupName = document.getElementById('group-name-input').value.trim();
+            const groupId = document.getElementById('group-id-input').value.trim();
+            await createGroup(groupName, groupId);
+            elements.createGroupModal.classList.remove('active');
+        });
+    }
+    
+    // Вход в группу
+    const joinGroupConfirm = document.getElementById('join-group-confirm');
+    if (joinGroupConfirm) {
+        joinGroupConfirm.addEventListener('click', async () => {
+            const groupId = document.getElementById('join-group-id-input').value.trim();
+            await joinGroup(groupId);
+            elements.joinGroupModal.classList.remove('active');
+        });
+    }
+    
+    // Смена вкладок сайдбара
+    const sidebarTabs = document.querySelectorAll('.sidebar-tab');
+    sidebarTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            switchSidebarTab(tabName);
+        });
+    });
+    
+    // Смена вкладок админ-панели
+    const adminTabs = document.querySelectorAll('.admin-tab');
+    adminTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            switchAdminTab(tabName);
+        });
+    });
+    
+    // Проверяем, был ли пользователь уже авторизован
+    checkAutoLogin();
+}
+
+function switchAuthTab(tab) {
+    console.log('Переключение вкладки:', tab);
+    
+    if (elements.tabLogin && elements.tabRegister) {
+        elements.tabLogin.classList.toggle('active', tab === 'login');
+        elements.tabRegister.classList.toggle('active', tab === 'register');
+    }
+    
+    if (elements.loginForm && elements.registerForm) {
+        elements.loginForm.style.display = tab === 'login' ? 'block' : 'none';
+        elements.registerForm.style.display = tab === 'register' ? 'block' : 'none';
+    }
+    
+    if (elements.authError) {
+        elements.authError.textContent = '';
+    }
+}
+
+function switchSidebarTab(tab) {
+    console.log('Переключение вкладки сайдбара:', tab);
+    
+    const tabs = document.querySelectorAll('.sidebar-tab');
+    const contents = document.querySelectorAll('.tab-content');
+    
+    tabs.forEach(t => t.classList.remove('active'));
+    contents.forEach(c => c.classList.remove('active'));
+    
+    document.querySelector(`.sidebar-tab[data-tab="${tab}"]`)?.classList.add('active');
+    document.getElementById(`${tab}-tab`)?.classList.add('active');
+}
+
+function switchAdminTab(tab) {
+    console.log('Переключение вкладки админ-панели:', tab);
+    
+    const tabs = document.querySelectorAll('.admin-tab');
+    const panes = document.querySelectorAll('.tab-pane');
+    
+    tabs.forEach(t => t.classList.remove('active'));
+    panes.forEach(p => p.classList.remove('active'));
+    
+    document.querySelector(`.admin-tab[data-tab="${tab}"]`)?.classList.add('active');
+    document.getElementById(`${tab}-tab`)?.classList.add('active');
+}
+
+async function checkAutoLogin() {
+    // Проверяем сохраненные данные в localStorage
+    const savedUser = localStorage.getItem('max_current_user');
+    if (savedUser) {
+        try {
+            const userData = JSON.parse(savedUser);
+            // Пытаемся войти с сохраненными данными
+            if (await login(userData.username, userData.password)) {
+                showNotification('Автоматический вход выполнен', 'success');
+            } else {
+                // Очищаем неверные данные
+                localStorage.removeItem('max_current_user');
+            }
+        } catch (error) {
+            console.error('Ошибка автоматического входа:', error);
+            localStorage.removeItem('max_current_user');
+        }
+    }
+}
+
+// Сохраняем данные пользователя при успешном входе
+function saveUserData(username, password) {
+    localStorage.setItem('max_current_user', JSON.stringify({
+        username: username,
+        password: password,
+        timestamp: Date.now()
+    }));
+}
+
+// Обновляем функцию login для сохранения данных
+async function login(username, password) {
+    try {
+        console.log('Попытка входа:', username);
+        
+        // Проверка администратора
+        if (username === 'мокасин' && password === '123321') {
+            console.log('Вход как администратор');
+            currentUser = {
+                uid: '123',
+                username: 'мокасин',
+                userid: '123',
+                isAdmin: true,
+                status: 'online'
+            };
+            isAdmin = true;
+            
+            // Сохраняем в базу данных
+            await database.ref(`users/мокасин`).set({
+                username: 'мокасин',
+                userid: '123',
+                password: '123321',
+                isAdmin: true,
+                status: 'online',
+                createdAt: Date.now()
+            });
+            
+            // Сохраняем в localStorage
+            saveUserData(username, password);
+            
+            await initializeUser();
+            return true;
+        }
+        
+        // Проверка обычного пользователя
+        const userRef = database.ref(`users/${username}`);
+        const snapshot = await userRef.once('value');
+        
+        if (!snapshot.exists()) {
+            showNotification('Пользователь не найден', 'error');
+            return false;
+        }
+        
+        const userData = snapshot.val();
+        console.log('Данные пользователя:', userData);
+        
+        if (userData.password !== password) {
+            showNotification('Неверный пароль', 'error');
+            return false;
+        }
+        
+        currentUser = {
+            uid: userData.userid || username,
+            username: username,
+            userid: userData.userid || username,
+            isAdmin: userData.isAdmin || false,
+            status: 'online'
+        };
+        
+        isAdmin = currentUser.isAdmin;
+        
+        // Обновляем статус
+        await userRef.update({
+            status: 'online',
+            lastSeen: Date.now()
+        });
+        
+        // Сохраняем в localStorage
+        saveUserData(username, password);
+        
+        await initializeUser();
+        return true;
+        
+    } catch (error) {
+        console.error('Ошибка входа:', error);
+        showNotification('Ошибка входа: ' + error.message, 'error');
+        return false;
+    }
+}
+
+// Запускаем приложение
 document.addEventListener('DOMContentLoaded', initApp);
+
+// Экспортируем функции для использования в консоли
+window.login = login;
+window.logout = logout;
+window.sendMessage = sendMessage;
+window.addFriend = addFriend;
+window.createGroup = createGroup;
+window.joinGroup = joinGroup;
+window.loadAdminData = loadAdminData;
